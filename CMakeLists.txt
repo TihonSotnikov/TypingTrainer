@@ -1,84 +1,66 @@
 cmake_minimum_required(VERSION 3.21)
 
+# Для сборки через vcpkg: при cmake --install копировать DLL зависимостей рядом с exe.
 set(X_VCPKG_APPLOCAL_DEPS_INSTALL ON)
-set(CMAKE_INSTALL_BINDIR .)
-set(CMAKE_AUTORCC ON)
-project(TypingTrainer)
 
-list(APPEND CMAKE_PREFIX_PATH "$ENV{VCPKG_ROOT}/installed/x64-windows")
+project(TypingTrainer
+    VERSION 1.0.0
+    DESCRIPTION "Тренажёр слепой печати с адаптивными упражнениями"
+    HOMEPAGE_URL "https://github.com/TihonSotnikov/TypingTrainer"
+    LANGUAGES CXX
+)
+
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if (MSVC)
-    add_compile_options(/utf-8)
+if (POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW) # время файлов из скачанных архивов = время распаковки
 endif()
 
-find_package(nlohmann_json 3.12.0 REQUIRED)
-find_package(
-    Qt6 COMPONENTS Core Qml Quick Widgets QuickControls2 QuickEffects REQUIRED)
-qt_standard_project_setup()
+option(TT_BUILD_APP "Собирать Qt-приложение (без него собираются только ядро и тесты)" ON)
+option(TT_BUILD_TESTS "Собирать автотесты ядра (GoogleTest скачивается автоматически)" OFF)
 
-qt_policy(SET QTP0001 NEW) # Устанавливает стандартный префикс ресурса в ":/qt/qml/"
-qt_policy(SET QTP0004 NEW) # Включает строгую проверку структуры каталогов QML
+# Предупреждения только для собственных целей проекта, сторонний код не трогаем.
+add_library(tt_warnings INTERFACE)
+if (MSVC)
+    target_compile_options(tt_warnings INTERFACE "$<$<COMPILE_LANGUAGE:CXX>:/W4;/permissive->")
+else()
+    target_compile_options(tt_warnings INTERFACE -Wall -Wextra -Wpedantic)
+endif()
+
+if (MSVC)
+    # Исходники и словари в UTF-8.
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/utf-8>)
+endif()
+
+if (WIN32)
+    # На Windows exe и все DLL лежат в корне дистрибутива. Задаётся до GNUInstallDirs и на
+    # верхнем уровне: отсюда значение берёт и скрипт развёртывания Qt.
+    set(CMAKE_INSTALL_BINDIR .)
+endif()
+
+if (TT_BUILD_APP)
+    set(TT_QT_COMPONENTS Gui Qml Quick QuickControls2)
+    if (TT_BUILD_TESTS)
+        list(APPEND TT_QT_COMPONENTS Test)
+    endif()
+    find_package(Qt6 6.5 REQUIRED COMPONENTS ${TT_QT_COMPONENTS})
+    qt_standard_project_setup(REQUIRES 6.5)
+    if (QT_KNOWN_POLICY_QTP0004)
+        qt_policy(SET QTP0004 NEW) # qmldir для подкаталогов с QML-файлами
+    endif()
+endif()
 
 add_subdirectory(src)
-add_subdirectory(src/frontend)
 add_subdirectory(src/backend)
 
-qt_add_executable(TypingTrainer
-    src/main.cpp
-    app_icon.rc
-)
+if (TT_BUILD_APP)
+    add_subdirectory(src/frontend)
+endif()
 
-set_source_files_properties(src/frontend/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-qt_add_qml_module(TypingTrainer
-    URI TypingTrainerModule
-    VERSION 1.0
-    QML_FILES
-        src/frontend/main.qml
-        src/frontend/Theme.qml
-        src/frontend/elements/XButton.qml
-        src/frontend/elements/XSegmentedControl.qml
-)
-
-# Disables console with Release configuration selected.
-set_target_properties(TypingTrainer PROPERTIES
-    WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>
-)
-
-target_link_libraries(
-    TypingTrainer PRIVATE
-    frontend
-    backend
-    Qt6::Widgets
-    Qt6::Qml
-    Qt6::Quick
-    Qt6::QuickControls2
-    Qt6::QuickEffects
-)
-
-# Deployment: Generates a deployment script and runs it after building the target.
-# Qt6 app should have necessary .dll plugins in the same directory as the executable.
-if(WIN32)
-    qt_generate_deploy_qml_app_script(
-        TARGET TypingTrainer
-        OUTPUT_SCRIPT deploy_script.cmake
-    )
-    
-    install(TARGETS TypingTrainer
-        BUNDLE DESTINATION .
-        RUNTIME DESTINATION .
-    )
-    
-    # # Выполняем скрипт деплоя ТОЛЬКО во время процесса инсталляции
-    install(SCRIPT ${deploy_script.cmake})
-
-    # add_custom_command(TARGET TypingTrainer POST_BUILD
-    #     COMMAND ${CMAKE_COMMAND} 
-    #             -D "DEPLOY_TARGET=$<TARGET_FILE:TypingTrainer>"
-    #             -D "QT_DEPLOY_PREFIX=$<TARGET_FILE_DIR:TypingTrainer>"
-    #             -D "QT_DEPLOY_BIN_DIR=."
-    #             -P "${deploy_script.cmake}"
-    #     COMMENT "Running deployment for TypingTrainer..."
-    #     VERBATIM
-    # )
+if (TT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

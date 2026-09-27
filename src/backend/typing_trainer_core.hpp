@@ -2,28 +2,26 @@
 
 #include "../concurrent_queue.hpp"
 #include "../contracts.hpp"
-#include "ngram_statistics.hpp"
-#include "smart_text_generator.hpp"
-#include <chrono>
-#include <cstddef>
+#include "session_engine.hpp"
+
+#include <filesystem>
 #include <functional>
 #include <mutex>
 #include <optional>
-#include <stop_token>
-#include <string>
 #include <thread>
-#include <vector>
 
 namespace typing_trainer
 {
 
 /// \brief Реализация ядра тренажера слепой печати.
-/// Управляет жизненным циклом сессии тренировки, обрабатывает ввод
-/// в фоновом потоке и рассчитывает метрики скорости и точности.
+/// Принимает события ввода, обрабатывает их в фоновом потоке через SessionEngine
+/// и складывает результаты в очередь для интерфейса.
 class TypingTrainerCore final : public ITypingTrainerCore
 {
 public:
-	TypingTrainerCore();
+	/// \param data_dir Каталог пользовательских данных (статистика n-грамм).
+	///                 Пустой путь - работа без сохранения на диск.
+	explicit TypingTrainerCore(const std::filesystem::path& data_dir);
 	~TypingTrainerCore() override;
 
 	TypingTrainerCore(const TypingTrainerCore&)            = delete;
@@ -41,43 +39,11 @@ public:
 	void set_output_ready_callback(std::function<void()> callback) override;
 
 private:
-	// ----- ФУНКЦИИ -----
-
-	/// \brief Основной рабочий цикл фонового потока.
-	void process_loop(const std::stop_token& stop_token);
-
-	/// \brief Распределение входящего события по обработчикам.
-	void handle_event(const InputEvent& event);
-
-	/// \brief Запуск новой сессии тренировки.
-	void start_session(const StartSessionCommand& command);
-
-	/// \brief Прерывание текущей сессии.
-	void stop_session();
-
-	/// \brief Потокобезопасная приостановка текущей сессии.
-	void pause_session();
-
-	/// \brief Внутренний метод приостановки без захвата мьютекса.
-	void pause_session_internal();
-
-	/// \brief Потокобезопасное возобновление текущей сессии.
-	void resume_session();
-
-	/// \brief Внутренний метод возобновления без захвата мьютекса.
-	void resume_session_internal();
-
-	/// \brief Обработка нажатия клавиши.
-	void process_key_press(const KeyPressData& key_data);
+	/// \brief Основной рабочий цикл фонового потока: работает, пока очередь не закрыта.
+	void process_loop();
 
 	/// \brief Потокобезопасный вызов колбэка интерфейса.
 	void notify_ui();
-
-	/// \brief Перерасчет метрик на основе текущего времени.
-	void recalculate_metrics(std::chrono::steady_clock::time_point current_time);
-
-
-	// ----- ДАННЫЕ -----
 
 	// Очереди асинхронного обмена сообщениями
 	ConcurrentQueue<InputEvent>   input_queue_;
@@ -87,29 +53,12 @@ private:
 	std::mutex            callback_mutex_;
 	std::function<void()> output_ready_callback_;
 
-	// Фоновый поток обработки ввода
-	std::jthread worker_thread_;
+	// Логика тренировки. Доступ только из рабочего потока.
+	SessionEngine engine_;
 
-	// Данные текущей сессии
-	std::mutex             session_mutex_;
-	SessionStatus          status_ = SessionStatus::Inactive;
-	std::u32string         text_to_type_;
-	std::vector<CharState> chars_;
-	size_t                 cursor_      = 0;
-	bool                   ignore_case_ = false;
-
-	// Статистика сессии и метрики
-	std::chrono::steady_clock::time_point last_resume_time_;
-	std::chrono::steady_clock::duration   accumulated_duration_{0};
-	size_t                                total_presses_ = 0;
-	size_t                                errors_count_  = 0;
-	SessionMetrics                        metrics_;
-
-	// Сбор статистики n-грамм для smart-режима
-	NgramStatistics ngram_stats_;
-
-	// Генератор текста для smart-режима
-	SmartTextGenerator smart_generator_;
+	// Фоновый поток обработки ввода. Объявлен последним: останавливается раньше,
+	// чем разрушаются данные, с которыми он работает.
+	std::thread worker_thread_;
 };
 
 } // namespace typing_trainer

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Typing Trainer
+Name[ru]=Typing Trainer
+GenericName=Touch Typing Trainer
+GenericName[ru]=Тренажёр слепой печати
+Comment=Touch typing trainer that adapts exercises to your weak key combinations
+Comment[ru]=Тренажёр слепой печати, который подстраивает упражнения под ваши слабые сочетания клавиш
+Exec=TypingTrainer
+Icon=typingtrainer
+Terminal=false
+Categories=Education;
+Keywords=typing;keyboard;touch typing;
+Keywords[ru]=печать;клавиатура;слепая печать;

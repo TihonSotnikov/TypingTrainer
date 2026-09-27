@@ -51,10 +51,10 @@ struct CharState
 
 struct SessionConfig
 {
-	TrainingMode   mode;
+	TrainingMode   mode = TrainingMode::Free;
 	std::u32string custom_text;
-	bool           ignore_case = false;
-	Language       language    = Language::English; ///< Словарь для Smart-режима.
+	bool           ignore_case   = false;
+	Language       language      = Language::English; ///< Словарь для Smart-режима.
 	double         filler_ratio  = 0.3; ///< Доля обычных слов в Smart-режиме («сложность»).
 	std::size_t    target_length = 250; ///< Размер блока Smart-режима в символах.
 };
@@ -75,9 +75,11 @@ struct KeyPressData
 };
 
 struct StartSessionCommand
-{
-	SessionConfig config;
-};
+{ SessionConfig config; };
+
+/// \brief Команда начать заново на том же тексте с теми же настройками.
+struct RestartSessionCommand
+{};
 
 struct StopSessionCommand
 {};
@@ -90,18 +92,29 @@ struct PauseSessionCommand
 struct ResumeSessionCommand
 {};
 
-using InputEvent = std::variant<KeyPressData, StartSessionCommand, StopSessionCommand,
-                                PauseSessionCommand, ResumeSessionCommand>;
+/// \brief Запрос накопленной статистики (ответ - StatisticsSnapshot).
+struct RequestStatisticsCommand
+{};
+
+/// \brief Команда стереть статистику n-грамм и историю сессий (ответ - StatisticsSnapshot).
+struct ResetStatisticsCommand
+{};
+
+using InputEvent = std::variant<KeyPressData, StartSessionCommand, RestartSessionCommand,
+                                StopSessionCommand, PauseSessionCommand, ResumeSessionCommand,
+                                RequestStatisticsCommand, ResetStatisticsCommand>;
 
 
 // ----- BACKEND -> FRONTEND (ОБРАБОТКА И ВЫВОД) -----
 
 struct SessionMetrics
 {
-	double wpm         = 0.0;   ///< Слов в минуту.
-	double cpm         = 0.0;   ///< Знаков в минуту.
-	double accuracy    = 100.0; ///< Точность в % (0..100).
-	double consistency = 0.0;   ///< Ритмичность/постоянность темпа в % (0..100).
+	double      wpm             = 0.0;   ///< Слов в минуту (слово = 5 знаков).
+	double      cpm             = 0.0;   ///< Верно набранных знаков в минуту.
+	double      accuracy        = 100.0; ///< Точность в % (0..100).
+	double      consistency     = 0.0;   ///< Ритмичность темпа в % (0..100); 0 - мало данных.
+	double      elapsed_seconds = 0.0;   ///< Чистое время набора, с (без пауз и простоя).
+	std::size_t keystrokes      = 0;     ///< Нажатий символьных клавиш за сессию.
 };
 
 /// \brief Полный снимок состояния для (ре)инициализации UI.
@@ -124,7 +137,52 @@ struct StateUpdate
 	SessionStatus  status       = SessionStatus::Active; ///< Текущий статус сессии.
 };
 
-using BackendEvent = std::variant<SessionState, StateUpdate>;
+/// \brief Нажатие отброшено: похоже на набор в раскладке другого алфавита.
+/// \note Такое нажатие не считается ни ошибкой, ни попыткой - UI стоит подсказать
+///       пользователю переключить раскладку.
+struct LayoutMismatch
+{
+	char32_t expected{}; ///< Ожидаемый символ.
+	char32_t pressed{};  ///< Фактически нажатый символ.
+};
+
+/// \brief Проблемность буквенного сочетания для отчётов.
+struct NgramReport
+{
+	std::u32string gram;
+	double         avg_time   = 0.0; ///< Средний интервал до символа, с.
+	double         error_rate = 0.0; ///< Доля ошибок, 0..1.
+	std::uint64_t  attempts   = 0;   ///< Сколько раз встречалось.
+};
+
+/// \brief Итог завершённой сессии - запись истории.
+struct SessionRecord
+{
+	std::int64_t   finished_at = 0; ///< Unix-время завершения, с.
+	TrainingMode   mode        = TrainingMode::Free;
+	Language       language    = Language::English; ///< Язык текста.
+	std::size_t    length      = 0;                 ///< Длина текста, символов.
+	std::size_t    errors      = 0;                 ///< Ошибочных нажатий.
+	SessionMetrics metrics;
+};
+
+/// \brief Результат только что завершённой сессии.
+struct SessionResult
+{
+	SessionRecord            record;
+	std::vector<NgramReport> weakest; ///< Самые проблемные сочетания этой сессии.
+	bool is_personal_best = false; ///< Лучшая скорость среди прошлых сессий того же режима и языка.
+};
+
+/// \brief Накопленная статистика для экрана статистики.
+struct StatisticsSnapshot
+{
+	std::vector<NgramReport>   weakest; ///< Самые проблемные сочетания за всё время.
+	std::vector<SessionRecord> history; ///< Завершённые сессии в хронологическом порядке.
+};
+
+using BackendEvent
+    = std::variant<SessionState, StateUpdate, SessionResult, StatisticsSnapshot, LayoutMismatch>;
 
 
 // ----- ИНТЕРФЕЙС ВЗАИМОДЕЙСТВИЯ -----

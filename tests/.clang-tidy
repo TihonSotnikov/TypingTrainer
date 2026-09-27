@@ -1,0 +1,16 @@
+---
+# Тесты наследуют правила проекта, но макросы GoogleTest дают ложные срабатывания
+# у части проверок, а индексация по заведомо проверенным размерам здесь норма.
+# Классы тестов Qt обрабатывает moc: их нельзя спрятать в анонимное пространство имён,
+# а «private slots:» раскрывается в повторный спецификатор доступа.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -cppcoreguidelines-owning-memory,
+  -readability-function-cognitive-complexity,
+  -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage,
+  -readability-redundant-access-specifiers
+...

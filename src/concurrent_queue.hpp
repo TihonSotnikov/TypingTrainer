@@ -4,7 +4,6 @@
 #include <mutex>
 #include <optional>
 #include <queue>
-#include <stop_token>
 #include <utility>
 
 /// \brief Потокобезопасная очередь с возможностью закрытия.
@@ -13,10 +12,10 @@ template<typename T>
 class ConcurrentQueue
 {
 private:
-	std::queue<T>               queue_;
-	mutable std::mutex          mtx_;
-	std::condition_variable_any cv_;
-	bool                        closed_ = false;
+	std::queue<T>           queue_;
+	mutable std::mutex      mtx_;
+	std::condition_variable cv_;
+	bool                    closed_ = false;
 
 public:
 	ConcurrentQueue()  = default;
@@ -51,12 +50,12 @@ public:
 	}
 
 	/// \brief Ожидает появления элемента и извлекает его.
-	/// \param stoken Токен остановки для прерывания ожидания.
-	/// \return Извлеченный элемент или std::nullopt при закрытой и пустой очереди.
-	std::optional<T> wait_and_pop(std::stop_token stoken)
+	/// \return Извлеченный элемент или std::nullopt, если очередь закрыта и пуста.
+	/// \note После close() оставшиеся элементы по-прежнему отдаются по одному.
+	std::optional<T> wait_and_pop()
 	{
 		std::unique_lock<std::mutex> lock(mtx_);
-		cv_.wait(lock, std::move(stoken), [this] { return !queue_.empty() || closed_; });
+		cv_.wait(lock, [this] { return !queue_.empty() || closed_; });
 		if (queue_.empty()) return std::nullopt;
 		std::optional<T> value = std::move(queue_.front());
 		queue_.pop();

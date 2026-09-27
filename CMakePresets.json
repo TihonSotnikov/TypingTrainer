@@ -1,34 +1,72 @@
 {
-    "version": 8,
+    "version": 6,
     "configurePresets": [
         {
-            "name": "vcpkg-debug",
-            "displayName": "Vcpkg Debug",
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}"
+        },
+        {
+            "name": "dev",
+            "displayName": "Debug + тесты",
+            "description": "Отладочная сборка приложения и автотестов",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "TT_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "core",
+            "displayName": "Ядро + тесты (без Qt)",
+            "description": "Собирает только backend и автотесты, Qt не нужен",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "TT_BUILD_APP": "OFF",
+                "TT_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "vcpkg-base",
+            "hidden": true,
+            "inherits": "base",
             "description": "Использует VCPKG_ROOT из переменных окружения",
-            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": {
                     "type": "FILEPATH",
                     "value": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-                },
+                }
+            }
+        },
+        {
+            "name": "vcpkg-debug",
+            "displayName": "Vcpkg Debug",
+            "inherits": "vcpkg-base",
+            "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
             "name": "vcpkg-release",
             "displayName": "Vcpkg Release",
-            "description": "Использует VCPKG_ROOT из переменных окружения",
-            "binaryDir": "${sourceDir}/build/${presetName}",
+            "inherits": "vcpkg-base",
             "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": {
-                    "type": "FILEPATH",
-                    "value": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-                },
                 "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ],
     "buildPresets": [
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "core",
+            "configurePreset": "core",
+            "configuration": "Debug"
+        },
         {
             "name": "debug",
             "configurePreset": "vcpkg-debug",
@@ -38,6 +76,24 @@
             "name": "release",
             "configurePreset": "vcpkg-release",
             "configuration": "Release"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "core",
+            "configurePreset": "core",
+            "configuration": "Debug",
+            "output": {
+                "outputOnFailure": true
+            }
         }
     ]
 }
