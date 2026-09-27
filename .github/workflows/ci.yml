@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "release/**"]
+  pull_request:
+  workflow_dispatch:
+  # Тот же конвейер собирает пакеты для релиза (release.yml).
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  QT_VERSION: "6.10.3"
+
+jobs:
+  core:
+    name: Core tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-15]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Ошибки и предупреждения компилятора - аннотациями в интерфейсе GitHub.
+      - name: Register problem matchers
+        run: echo "::add-matcher::.github/problem-matchers.json"
+
+      - name: Configure
+        run: cmake --preset core
+
+      - name: Build
+        run: cmake --build --preset core --parallel
+
+      - name: Test
+        run: ctest --preset core
+
+  app:
+    name: App (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-22.04
+            qt: "6.10.3"
+            package: true
+          - name: Windows
+            os: windows-2022
+            qt: "6.10.3"
+            package: true
+          - name: macOS
+            os: macos-15
+            qt: "6.10.3"
+            package: true
+          # Минимальная поддерживаемая версия Qt: только сборка и тесты.
+          - name: Linux, Qt 6.5
+            os: ubuntu-22.04
+            qt: "6.5.3"
+            package: false
+    steps:
+      - uses: actions/checkout@v7
+
+      # Ошибки и предупреждения компилятора - аннотациями в интерфейсе GitHub.
+      - name: Register problem matchers
+        run: echo "::add-matcher::.github/problem-matchers.json"
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1-mesa-dev libgl1-mesa-dri libegl1 libfontconfig1 libdbus-1-3 libfuse2 \
+            libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+            xvfb
+
+      - name: Install Qt ${{ matrix.qt }}
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          cache: true
+
+      - name: Read project version
+        id: version
+        shell: bash
+        run: echo "version=$(sed -n 's/^ *VERSION \([0-9][0-9.]*\)$/\1/p' CMakeLists.txt | head -n1)" >> "$GITHUB_OUTPUT"
+
+      - name: Configure
+        shell: bash
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DTT_BUILD_TESTS=ON
+          ${{ runner.os == 'macOS' && '-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0' || '' }}
+
+      - name: Build
+        shell: bash
+        run: .github/scripts/run-annotated.sh Build cmake --build build --config Release --parallel
+
+      - name: Test
+        shell: bash
+        run: .github/scripts/run-annotated.sh Test ctest --test-dir build -C Release --output-on-failure
+
+      # ----- Windows: zip с exe и всеми DLL -----
+
+      - name: Install (Windows)
+        if: matrix.package && runner.os == 'Windows'
+        shell: bash
+        # Развёртыванию Qt нужен абсолютный путь установки.
+        run: .github/scripts/run-annotated.sh Install cmake --install build --config Release --prefix "$(cygpath -m "$PWD")/dist/TypingTrainer"
+
+      - name: Smoke test (Windows)
+        if: matrix.package && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:QT_QUICK_BACKEND = "software"
+          $env:QT_FORCE_STDERR_LOGGING = "1"
+          $env:TYPING_TRAINER_DATA_DIR = "$env:RUNNER_TEMP/tt-smoke"
+          $app = Start-Process dist/TypingTrainer/TypingTrainer.exe -ArgumentList "--smoke-test" `
+            -Wait -PassThru -RedirectStandardError smoke.log
+          if ($app.ExitCode -ne 0) {
+            Get-Content smoke.log | ForEach-Object { "::error title=Smoke test::$_" }
+            throw "smoke test failed with exit code $($app.ExitCode)"
+          }
+
+      - name: Archive (Windows)
+        if: matrix.package && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "TypingTrainer-${{ steps.version.outputs.version }}-windows-x64.zip"
+          Compress-Archive -Path dist/TypingTrainer -DestinationPath $name
+          "PACKAGE=$name" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # ----- macOS: universal .app в .dmg -----
+
+      - name: Install (macOS)
+        if: matrix.package && runner.os == 'macOS'
+        run: |
+          cmake --install build --config Release --prefix "$PWD/dist"
+          lipo -info dist/TypingTrainer.app/Contents/MacOS/TypingTrainer
+
+      - name: Smoke test (macOS)
+        if: matrix.package && runner.os == 'macOS'
+        run: |
+          QT_QUICK_BACKEND=software TYPING_TRAINER_DATA_DIR="$RUNNER_TEMP/tt-smoke" \
+            dist/TypingTrainer.app/Contents/MacOS/TypingTrainer --smoke-test 2> smoke.log \
+            || { sed 's/^/::error title=Smoke test::/' smoke.log; exit 1; }
+
+      - name: Disk image (macOS)
+        if: matrix.package && runner.os == 'macOS'
+        run: |
+          # Подпись без сертификата: без неё Apple Silicon не запустит изменённые бинарники.
+          codesign --force --deep --sign - dist/TypingTrainer.app
+          mkdir dmg
+          cp -R dist/TypingTrainer.app dmg/
+          ln -s /Applications dmg/Applications
+          name="TypingTrainer-${{ steps.version.outputs.version }}-macos-universal.dmg"
+          hdiutil create -volname "Typing Trainer" -srcfolder dmg -ov -format UDZO "$name"
+          echo "PACKAGE=$name" >> "$GITHUB_ENV"
+
+      # ----- Linux: AppImage -----
+
+      - name: AppImage (Linux)
+        if: matrix.package && runner.os == 'Linux'
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          cmake --install build --prefix "$PWD/AppDir/usr"
+          base=https://github.com/linuxdeploy
+          curl -fsSL -o linuxdeploy "$base/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          curl -fsSL -o linuxdeploy-plugin-qt "$base/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
+          name="TypingTrainer-${{ steps.version.outputs.version }}-linux-x86_64.AppImage"
+          export QML_SOURCES_PATHS="$PWD/src/frontend/qml"
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          export LDAI_OUTPUT="$name"
+          ./linuxdeploy --appdir AppDir --plugin qt --output appimage \
+            --desktop-file AppDir/usr/share/applications/io.github.tihonsotnikov.TypingTrainer.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/typingtrainer.png
+          echo "PACKAGE=$name" >> "$GITHUB_ENV"
+
+      - name: Smoke test (Linux)
+        if: matrix.package && runner.os == 'Linux'
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          QT_QUICK_BACKEND=software TYPING_TRAINER_DATA_DIR="$RUNNER_TEMP/tt-smoke" \
+            xvfb-run -a "./$PACKAGE" --smoke-test 2> smoke.log \
+            || { sed 's/^/::error title=Smoke test::/' smoke.log; exit 1; }
+
+      - name: Upload package
+        if: matrix.package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ runner.os }}
+          path: ${{ env.PACKAGE }}
+          if-no-files-found: error
