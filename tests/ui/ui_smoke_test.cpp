@@ -45,6 +45,7 @@ private slots:
 	void themesRenderWithoutWarnings();
 	void autoPauseStopsTheClock();
 	void longTextIsShownInPages();
+	void emptyCustomTextStopsSession();
 
 private:
 	/// \brief Текст текущей сессии без HTML-разметки.
@@ -413,6 +414,27 @@ void UiSmokeTest::longTextIsShownInPages()
 	trainer_->setSmartMode(true);
 	trainer_->start();
 	QTRY_VERIFY(trainer_->status() == Status::Active && trainer_->displayOffset() == 0);
+}
+
+void UiSmokeTest::emptyCustomTextStopsSession()
+{
+	// После нормализации от текста ничего не остаётся - прежняя тренировка не должна
+	// продолжаться под видом своего текста, а Tab - перезапускать старый текст.
+	waitForActiveSession();
+	trainer_->setCustomText(QString(QChar(0x200B)));
+	QVERIFY(trainer_->customText().isEmpty());
+	trainer_->setSmartMode(false);
+	trainer_->start();
+	QTRY_COMPARE(trainer_->status(), Status::Inactive);
+	QCOMPARE(trainer_->textLength(), 0);
+
+	QTest::keyClick(window_, Qt::Key_Tab);
+	QTest::qWait(200);
+	QCOMPARE(trainer_->status(), Status::Inactive);
+
+	trainer_->setSmartMode(true);
+	trainer_->start();
+	waitForActiveSession();
 }
 
 QTEST_MAIN(UiSmokeTest)

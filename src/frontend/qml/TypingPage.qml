@@ -75,7 +75,7 @@ FocusScope {
             event.accepted = true
             return
         case Qt.Key_Tab:
-            restartText()
+            if (Trainer.status !== Trainer.Inactive) restartText()
             event.accepted = true
             return
         case Qt.Key_Escape:

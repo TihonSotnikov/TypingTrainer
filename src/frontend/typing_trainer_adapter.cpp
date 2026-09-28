@@ -143,7 +143,12 @@ QmlTypingTrainerAdapter::~QmlTypingTrainerAdapter()
 
 void QmlTypingTrainerAdapter::start()
 {
-	if (!smart_mode_ && normalize_text(custom_text_.toStdU32String()).empty()) return;
+	// Набирать нечего - прежняя тренировка не должна остаться активной под видом своего текста.
+	if (!smart_mode_ && normalize_text(custom_text_.toStdU32String()).empty())
+	{
+		stop();
+		return;
+	}
 	core_->push_input(StartSessionCommand{.config = sessionConfig()});
 }
 
