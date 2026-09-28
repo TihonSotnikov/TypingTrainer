@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 set(X_VCPKG_APPLOCAL_DEPS_INSTALL ON)
 
 project(TypingTrainer
-    VERSION 1.1.0
+    VERSION 1.1.1
     DESCRIPTION "Тренажёр слепой печати с адаптивными упражнениями"
     HOMEPAGE_URL "https://github.com/TihonSotnikov/TypingTrainer"
     LANGUAGES CXX
