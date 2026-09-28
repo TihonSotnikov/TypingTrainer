@@ -57,3 +57,6 @@ ngram_stats.json
 .DS_Store
 # Локальные пресеты CMake
 CMakeUserPresets.json
+
+# Лог установщика Qt (aqtinstall)
+aqtinstall.log
