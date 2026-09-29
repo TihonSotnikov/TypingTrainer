@@ -31,7 +31,7 @@ public:
 	/// \return true, если очередь пуста, иначе false.
 	[[nodiscard]] bool empty() const
 	{
-		std::scoped_lock lock(mtx_);
+		std::scoped_lock const lock(mtx_);
 		return queue_.empty();
 	}
 
@@ -71,14 +71,6 @@ public:
 		std::optional<T> value = std::move(queue_.front());
 		queue_.pop();
 		return value;
-	}
-
-	/// \brief Очищает данные в очереди.
-	void clear()
-	{
-		std::scoped_lock lock(mtx_);
-		std::queue<T>    empty;
-		queue_.swap(empty);
 	}
 
 	/// \brief Закрывает очередь для добавления и пробуждает ожидающие потоки.
