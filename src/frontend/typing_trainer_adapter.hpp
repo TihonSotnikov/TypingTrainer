@@ -34,6 +34,8 @@ class QmlTypingTrainerAdapter : public QObject
 	Q_PROPERTY(int textLength READ textLength NOTIFY formattedTextChanged)
 	/// Индекс первого символа, показанного в formattedText (длинный текст выводится страницами).
 	Q_PROPERTY(int displayOffset READ displayOffset NOTIFY formattedTextChanged)
+	/// Позиция курсора в formattedText: от начала страницы, в единицах UTF-16 документа.
+	Q_PROPERTY(int displayCursorPosition READ displayCursorPosition NOTIFY formattedTextChanged)
 	Q_PROPERTY(int cursorPosition READ cursorPosition NOTIFY cursorPositionChanged)
 	Q_PROPERTY(bool typingStarted READ typingStarted NOTIFY metricsChanged)
 
@@ -112,6 +114,7 @@ public:
 	[[nodiscard]] QString formattedText() const { return formatted_text_; }
 	[[nodiscard]] int     textLength() const { return static_cast<int>(chars_.size()); }
 	[[nodiscard]] int     displayOffset() const { return static_cast<int>(page_start_); }
+	[[nodiscard]] int     displayCursorPosition() const { return display_cursor_; }
 	[[nodiscard]] int     cursorPosition() const { return cursor_position_; }
 	[[nodiscard]] bool    typingStarted() const { return metrics_.keystrokes > 0; }
 
@@ -218,6 +221,7 @@ private:
 	Status                   status_ = Status::Inactive;
 	std::vector<CharState>   chars_;
 	int                      cursor_position_ = 0;
+	int                      display_cursor_  = 0;
 	std::vector<std::size_t> page_starts_{0}; ///< Начала страниц длинного текста.
 	std::size_t              page_start_ = 0;
 	std::size_t              page_end_   = 0;

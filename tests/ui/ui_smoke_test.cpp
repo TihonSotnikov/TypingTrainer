@@ -48,6 +48,7 @@ private slots:
 	void emptyCustomTextStopsSession();
 	void typingStartsAfterEditingCustomText();
 	void decomposedLettersAreComposed();
+	void caretFollowsCharactersOutsideBmp();
 
 private:
 	/// \brief Текст текущей сессии без HTML-разметки.
@@ -148,11 +149,13 @@ int UiSmokeTest::humanDelay()
 
 void UiSmokeTest::type(const QString& text, int delay_ms) const
 {
-	// Для QWindow в QtTest нет keyClicks: отправляем нажатие с текстом на каждый символ.
-	for (QChar const ch : text)
+	// Для QWindow в QtTest нет keyClicks: отправляем нажатие с текстом на каждый символ
+	// (символ вне BMP - одно нажатие, а не две половинки суррогатной пары).
+	for (char32_t const ch : text.toStdU32String())
 	{
 		QTest::qWait(delay_ms);
-		QTest::sendKeyEvent(QTest::Click, window_, Qt::Key_unknown, QString(ch), Qt::NoModifier);
+		QTest::sendKeyEvent(QTest::Click, window_, Qt::Key_unknown, QString::fromUcs4(&ch, 1),
+		                    Qt::NoModifier);
 	}
 }
 
@@ -480,6 +483,24 @@ void UiSmokeTest::decomposedLettersAreComposed()
 	type(QStringLiteral("мой ёж"));
 	QTRY_COMPARE(trainer_->status(), Status::Completed);
 	QCOMPARE(trainer_->accuracy(), 100.0);
+
+	trainer_->setSmartMode(true);
+	trainer_->start();
+	waitForActiveSession();
+}
+
+void UiSmokeTest::caretFollowsCharactersOutsideBmp()
+{
+	// Эмодзи - один символ набора, но две позиции UTF-16 в документе с текстом.
+	QString const text = QString::fromUtf16(u"a\U0001F600b c");
+	trainer_->setCustomText(text);
+	trainer_->setSmartMode(false);
+	trainer_->start();
+	QTRY_VERIFY(trainer_->status() == Status::Active && currentText() == text);
+
+	type(QString::fromUtf16(u"a\U0001F600"));
+	QTRY_COMPARE(trainer_->cursorPosition(), 2);
+	QCOMPARE(trainer_->displayCursorPosition(), 3);
 
 	trainer_->setSmartMode(true);
 	trainer_->start();
