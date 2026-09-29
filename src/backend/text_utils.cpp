@@ -1,8 +1,12 @@
 #include "text_utils.hpp"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace typing_trainer
 {
@@ -10,11 +14,15 @@ namespace typing_trainer
 namespace
 {
 
+/// \brief Ширина табуляции в отступе строки, пробелов.
+constexpr std::size_t K_TAB_WIDTH = 4;
+
 /// \brief Что делать с символом при нормализации.
 enum class CharClass : std::uint8_t
 {
 	Keep,
 	Space,
+	LineBreak,
 	Drop,
 	DoubleQuote,
 	SingleQuote,
@@ -36,17 +44,19 @@ CharClass classify(char32_t ch)
 {
 	switch (ch)
 	{
-	case U' ':
-	case U'\t':
 	case U'\n':
 	case U'\v':
 	case U'\f':
 	case U'\r':
 	case 0x0085: // NEXT LINE
-	case 0x00A0: // неразрывный пробел
-	case 0x1680: // пробел огамического письма
 	case 0x2028: // разделитель строк
 	case 0x2029: // разделитель абзацев
+		return CharClass::LineBreak;
+
+	case U' ':
+	case U'\t':
+	case 0x00A0: // неразрывный пробел
+	case 0x1680: // пробел огамического письма
 	case 0x202F: // узкий неразрывный пробел
 	case 0x205F: // средний математический пробел
 	case 0x3000: // идеографический пробел
@@ -98,6 +108,44 @@ CharClass classify(char32_t ch)
 	return CharClass::Keep;
 }
 
+/// \brief Строка текста: отступ в пробелах и содержимое без него.
+struct Line
+{
+	std::size_t    indent = 0;
+	std::u32string body;
+};
+
+/// \brief Отступ после ещё одного пробельного символа в начале строки.
+std::size_t widen_indent(std::size_t indent, char32_t space)
+{ return (space == U'\t') ? ((indent / K_TAB_WIDTH) + 1) * K_TAB_WIDTH : indent + 1; }
+
+/// \brief Собрать строки в текст: общий отступ убирается, пустые строки по краям
+///        отбрасываются, несколько пустых подряд сводятся к одной.
+/// \note Без общего отступа фрагмент кода из середины файла начинается с края,
+///       но сохраняет вложенность.
+std::u32string join_lines(const std::vector<Line>& lines)
+{
+	std::size_t common_indent = std::numeric_limits<std::size_t>::max();
+	for (auto const& line : lines)
+		if (!line.body.empty()) common_indent = std::min(common_indent, line.indent);
+
+	std::u32string result;
+	bool           blank_before = false;
+	for (auto const& line : lines)
+	{
+		if (line.body.empty())
+		{
+			blank_before = !result.empty();
+			continue;
+		}
+		if (!result.empty()) result += blank_before ? U"\n\n" : U"\n";
+		result.append(line.indent - common_indent, U' ');
+		result += line.body;
+		blank_before = false;
+	}
+	return result;
+}
+
 } // namespace
 
 Script script_of(char32_t ch)
@@ -136,25 +184,32 @@ bool is_layout_mismatch(char32_t expected, char32_t pressed)
 
 std::u32string normalize_text(std::u32string_view text)
 {
-	std::u32string result;
-	result.reserve(text.size());
-
-	bool       pending_space = false;
-	auto const append        = [&](std::u32string_view piece) {
-		if (pending_space && !result.empty()) result.push_back(U' ');
+	std::vector<Line> lines(1);
+	bool              pending_space = false; // пробел внутри строки, ещё не записанный
+	auto const        append        = [&](std::u32string_view piece) {
+		Line& line = lines.back();
+		if (pending_space && !line.body.empty()) line.body.push_back(U' ');
 		pending_space = false;
-		result.append(piece);
+		line.body.append(piece);
 	};
 
-	for (char32_t const ch : text)
+	for (std::size_t i = 0; i < text.size(); ++i)
 	{
+		char32_t const ch = text.at(i);
 		switch (classify(ch))
 		{
 		case CharClass::Keep:
 			append(std::u32string_view(&ch, 1));
 			break;
 		case CharClass::Space:
-			pending_space = true;
+			if (lines.back().body.empty())
+				lines.back().indent = widen_indent(lines.back().indent, ch);
+			else pending_space = true;
+			break;
+		case CharClass::LineBreak:
+			if (ch == U'\r' && i + 1 < text.size() && text.at(i + 1) == U'\n') ++i; // CRLF
+			lines.emplace_back();
+			pending_space = false;
 			break;
 		case CharClass::Drop:
 			break;
@@ -173,7 +228,7 @@ std::u32string normalize_text(std::u32string_view text)
 		}
 	}
 
-	return result;
+	return join_lines(lines);
 }
 
 } // namespace typing_trainer

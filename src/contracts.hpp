@@ -65,7 +65,8 @@ struct SessionConfig
 enum class ControlKey : std::uint8_t
 {
 	Backspace,
-	Escape
+	Escape,
+	Enter ///< Перевод строки, если текст ждёт его; в середине строки игнорируется.
 };
 
 struct KeyPressData

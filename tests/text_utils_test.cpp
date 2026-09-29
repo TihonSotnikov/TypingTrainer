@@ -45,10 +45,20 @@ TEST(TextUtils, LayoutMismatchOnlyBetweenAlphabets)
 	EXPECT_FALSE(is_layout_mismatch(U'ж', U';'));
 }
 
-TEST(TextUtils, NormalizeCollapsesWhitespace)
+TEST(TextUtils, NormalizeCollapsesSpacesWithinLines)
 {
-	EXPECT_EQ(normalize_text(U"  first line\n\nsecond\tline  "), U"first line second line");
-	EXPECT_EQ(normalize_text(chars({U'a', 0x00A0, U'b', 0x2009, U'c', 0x2028, U'd'})), U"a b c d");
+	EXPECT_EQ(normalize_text(U"  first   line  \n\n\n\n  second\tline  "),
+	          U"first line\n\nsecond line");
+	EXPECT_EQ(normalize_text(chars({U'a', 0x00A0, U'b', 0x2009, U'c'})), U"a b c");
+}
+
+TEST(TextUtils, NormalizeKeepsLineBreaksAndRelativeIndentation)
+{
+	// Фрагмент кода из середины файла: CRLF, отступы табуляцией и пробелами.
+	EXPECT_EQ(normalize_text(U"\r\n    if (x)\r\n\t\ty();  \r\n\r\n\r\n    z();\r\n"),
+	          U"if (x)\n    y();\n\nz();");
+	EXPECT_EQ(normalize_text(chars({U'a', 0x2028, U'b', 0x2029, U'c', U'\r', U'd'})),
+	          U"a\nb\nc\nd");
 }
 
 TEST(TextUtils, NormalizeReplacesTypography)
