@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
 
-# Для сборки через vcpkg: при cmake --install копировать DLL зависимостей рядом с exe.
-set(X_VCPKG_APPLOCAL_DEPS_INSTALL ON)
-
 project(TypingTrainer
     VERSION 1.1.1
     DESCRIPTION "Тренажёр слепой печати с адаптивными упражнениями"

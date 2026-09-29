@@ -26,34 +26,6 @@
                 "TT_BUILD_APP": "OFF",
                 "TT_BUILD_TESTS": "ON"
             }
-        },
-        {
-            "name": "vcpkg-base",
-            "hidden": true,
-            "inherits": "base",
-            "description": "Использует VCPKG_ROOT из переменных окружения",
-            "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": {
-                    "type": "FILEPATH",
-                    "value": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-                }
-            }
-        },
-        {
-            "name": "vcpkg-debug",
-            "displayName": "Vcpkg Debug",
-            "inherits": "vcpkg-base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "vcpkg-release",
-            "displayName": "Vcpkg Release",
-            "inherits": "vcpkg-base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
         }
     ],
     "buildPresets": [
@@ -66,16 +38,6 @@
             "name": "core",
             "configurePreset": "core",
             "configuration": "Debug"
-        },
-        {
-            "name": "debug",
-            "configurePreset": "vcpkg-debug",
-            "configuration": "Debug"
-        },
-        {
-            "name": "release",
-            "configurePreset": "vcpkg-release",
-            "configuration": "Release"
         }
     ],
     "testPresets": [
