@@ -244,6 +244,15 @@ FocusScope {
         modal: true
         title: "Сбросить статистику?"
 
+        // У Material в тёмной теме подложка светлая: окно под диалогом засвечивалось.
+        Overlay.modal: Rectangle {
+            color: Theme.scrim
+
+            Behavior on opacity {
+                NumberAnimation { duration: 150 }
+            }
+        }
+
         ColumnLayout {
             spacing: 18
 
