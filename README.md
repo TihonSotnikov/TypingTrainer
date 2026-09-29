@@ -4,6 +4,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/TihonSotnikov/TypingTrainer/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/TihonSotnikov/TypingTrainer/ci.yml?branch=main&style=flat&logo=githubactions&logoColor=white&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat&logo=cplusplus&logoColor=white" alt="C++20">
   <img src="https://img.shields.io/badge/Qt-6.5%2B-41CD52?style=flat&logo=qt&logoColor=white" alt="Qt 6.5+">
   <img src="https://img.shields.io/badge/CMake-3.21%2B-064F8C?style=flat&logo=cmake&logoColor=white" alt="CMake 3.21+">
