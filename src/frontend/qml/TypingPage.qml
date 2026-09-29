@@ -19,6 +19,15 @@ FocusScope {
     readonly property bool paused: Trainer.status === Trainer.Paused
     readonly property bool completed: Trainer.status === Trainer.Completed
 
+    /// Главное действие вне набора (кнопка и Enter): новый текст в умном режиме,
+    /// правка текста в режиме своего текста - там «новый текст» совпадал бы с «заново».
+    readonly property string nextActionText: Trainer.smartMode ? "Новый текст" : "Изменить текст"
+
+    function nextAction() {
+        if (Trainer.smartMode) newText()
+        else startEditing()
+    }
+
     /// Начать тренировку на новом тексте.
     function newText() {
         Trainer.start()
@@ -73,7 +82,7 @@ FocusScope {
         case Qt.Key_Return:
         case Qt.Key_Enter:
             if (paused) Trainer.resume()
-            else if (!active || !Trainer.typingStarted) newText()
+            else if (!active || !Trainer.typingStarted) nextAction()
             event.accepted = true
             return
         case Qt.Key_Tab:
@@ -293,8 +302,9 @@ FocusScope {
                 anchors.fill: typingArea
                 visible: page.completed && !page.resultsDismissed && !page.editing
                 result: Trainer.lastResult
+                nextText: page.nextActionText
                 onRepeatRequested: page.restartText()
-                onNextRequested: page.newText()
+                onNextRequested: page.nextAction()
             }
 
             // Предупреждение о раскладке
@@ -362,18 +372,12 @@ FocusScope {
                 KeyHint {
                     visible: !page.paused && !(page.active && Trainer.typingStarted)
                     key: "Enter"
-                    text: "новый текст"
+                    text: page.nextActionText.toLowerCase()
                 }
             }
 
             Item {
                 Layout.fillWidth: true
-            }
-
-            XButton {
-                visible: !Trainer.smartMode
-                text: "Изменить текст"
-                onClicked: page.startEditing()
             }
 
             XButton {
@@ -383,9 +387,9 @@ FocusScope {
             }
 
             XButton {
-                text: "Новый текст"
+                text: page.nextActionText
                 highlighted: true
-                onClicked: page.newText()
+                onClicked: page.nextAction()
             }
         }
     }
