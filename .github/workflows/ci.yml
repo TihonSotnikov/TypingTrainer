@@ -173,9 +173,15 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
           cmake --install build --prefix "$PWD/AppDir/usr"
+          # Фиксированные выпуски linuxdeploy с проверкой контрольных сумм, а не ночные сборки:
+          # пакет собирается одинаково при каждом запуске.
           base=https://github.com/linuxdeploy
-          curl -fsSL -o linuxdeploy "$base/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
-          curl -fsSL -o linuxdeploy-plugin-qt "$base/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
+          curl -fsSL -o linuxdeploy "$base/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage"
+          curl -fsSL -o linuxdeploy-plugin-qt "$base/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage"
+          sha256sum -c <<'EOF'
+          c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d  linuxdeploy
+          15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724  linuxdeploy-plugin-qt
+          EOF
           chmod +x linuxdeploy linuxdeploy-plugin-qt
           name="TypingTrainer-${{ steps.version.outputs.version }}-linux-x86_64.AppImage"
           export QML_SOURCES_PATHS="$PWD/src/frontend/qml"
