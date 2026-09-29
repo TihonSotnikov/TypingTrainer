@@ -22,6 +22,16 @@ enum class CharClass : std::uint8_t
 	Ellipsis
 };
 
+/// \brief Комбинируемый знак: ударение, диерезис и т.п. поверх предыдущей буквы.
+bool is_combining_mark(char32_t ch)
+{
+	return (ch >= 0x0300 && ch <= 0x036F)     // основные
+	       || (ch >= 0x1AB0 && ch <= 0x1AFF)  // расширенные
+	       || (ch >= 0x1DC0 && ch <= 0x1DFF)  // дополнительные
+	       || (ch >= 0x20D0 && ch <= 0x20FF)  // для символов
+	       || (ch >= 0xFE20 && ch <= 0xFE2F); // половинные
+}
+
 CharClass classify(char32_t ch)
 {
 	switch (ch)
@@ -84,6 +94,7 @@ CharClass classify(char32_t ch)
 
 	if (ch >= 0x2000 && ch <= 0x200A) return CharClass::Space;           // типографские пробелы
 	if (ch < 0x20 || (ch >= 0x7F && ch <= 0x9F)) return CharClass::Drop; // управляющие
+	if (is_combining_mark(ch)) return CharClass::Drop;
 	return CharClass::Keep;
 }
 
