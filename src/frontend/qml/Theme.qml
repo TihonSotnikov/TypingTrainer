@@ -36,6 +36,8 @@ Item {
     readonly property color success: pick("#1C8A43", "#5CCB7F", "#5CCB7F")
     readonly property color warning: pick("#A35F00", "#F0B458", "#F0B458")
     readonly property color warningBackground: pick("#FFF3DE", "#3B2F1A", "#2A210F")
+    /// Затемнение под модальным окном.
+    readonly property color scrim: pick("#66000000", "#99000000", "#B3000000")
 
     // ----- Набираемый текст -----
     readonly property color pending: pick("#9CA3AE", "#626671", "#55585F")
