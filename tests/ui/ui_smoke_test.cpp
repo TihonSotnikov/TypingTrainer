@@ -1,6 +1,6 @@
 // Дымовые тесты интерфейса: настоящий Main.qml без экрана (QT_QPA_PLATFORM=offscreen),
 // ввод через эмуляцию клавиатуры. Если задана переменная TT_SCREENSHOT_DIR, по ходу
-// сценариев сохраняются скриншоты (так же обновляются картинки для README).
+// сценариев сохраняются скриншоты (08-statistics - скриншот статистики для README).
 
 #include "typing_trainer_adapter.hpp"
 
@@ -21,6 +21,9 @@
 #include <QtTest>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <random>
 
 Q_IMPORT_QML_PLUGIN(TypingTrainerModulePlugin)
 
@@ -61,7 +64,9 @@ private:
 	/// \brief Напечатать строку с паузой между нажатиями.
 	void type(const QString& text, int delay_ms = 30) const;
 
-	/// \brief Пауза между нажатиями «как у человека»: для скриншотов ~55 WPM, иначе быстрее.
+	/// \brief Пауза между нажатиями: для скриншотов ~50 WPM, иначе быстрее.
+	/// \note Тренировка, завершённая при съёмке, - последняя точка графика статистики:
+	///       её скорость должна продолжать демо-историю.
 	[[nodiscard]] static int humanDelay();
 
 	/// \brief Сохранить скриншот, если задан TT_SCREENSHOT_DIR.
@@ -146,7 +151,7 @@ void UiSmokeTest::waitForActiveSession() const
 }
 
 int UiSmokeTest::humanDelay()
-{ return qEnvironmentVariable("TT_SCREENSHOT_DIR").isEmpty() ? 45 : 210; }
+{ return qEnvironmentVariable("TT_SCREENSHOT_DIR").isEmpty() ? 45 : 245; }
 
 void UiSmokeTest::type(const QString& text, int delay_ms) const
 {
@@ -178,26 +183,78 @@ void UiSmokeTest::setTheme(const QString& theme) const
 
 void UiSmokeTest::seedDemoData() const
 {
-	// Месяц тренировок с постепенным ростом скорости.
-	QJsonArray sessions;
-	QDateTime  finished = QDateTime::currentDateTime().addDays(-30);
-	for (int i = 0; i < 28; ++i)
+	// Две с небольшим недели, как у живого человека: несколько дней подряд, пропуски,
+	// по нескольку тренировок за вечер. Скорость держится около 48-50, проседает
+	// и к концу поднимается до 50-52, но от тренировки к тренировке заметно скачет.
+	struct Day
 	{
-		double const wpm = 36.0 + (i * 0.9) + ((i * 7) % 5) - 2.0;
-		sessions.append(QJsonObject{
-		    {"finished_at", finished.toSecsSinceEpoch()},
-		    {"mode", i % 4 == 3 ? "free" : "smart"},
-		    {"language", "ru"},
-		    {"length", 250},
-		    {"errors", 3 + (i % 4)},
-		    {"wpm", wpm},
-		    {"cpm", wpm * 5.0},
-		    {"accuracy", 94.0 + ((i % 5) * 0.8)},
-		    {"consistency", 62.0 + ((i % 6) * 2.0)},
-		    {"duration", 250.0 / (wpm * 5.0) * 60.0},
-		    {"keystrokes", 258},
-		});
-		finished = finished.addSecs(86'400 + ((i % 3) * 3'600));
+		int days_ago;
+		int sessions;
+		int start_hour;
+	};
+	constexpr std::array days = {
+	    Day{.days_ago = 16, .sessions = 3, .start_hour = 20},
+	    Day{.days_ago = 15, .sessions = 2, .start_hour = 21},
+	    Day{.days_ago = 14, .sessions = 4, .start_hour = 19},
+	    Day{.days_ago = 11, .sessions = 3, .start_hour = 21},
+	    Day{.days_ago = 10, .sessions = 5, .start_hour = 18},
+	    Day{.days_ago = 9, .sessions = 2, .start_hour = 22},
+	    Day{.days_ago = 8, .sessions = 4, .start_hour = 20},
+	    Day{.days_ago = 7, .sessions = 3, .start_hour = 21},
+	    Day{.days_ago = 6, .sessions = 3, .start_hour = 19},
+	    Day{.days_ago = 5, .sessions = 4, .start_hour = 20},
+	    Day{.days_ago = 3, .sessions = 2, .start_hour = 22},
+	    Day{.days_ago = 2, .sessions = 4, .start_hour = 20},
+	    Day{.days_ago = 1, .sessions = 3, .start_hour = 21},
+	};
+	int total = 0;
+	for (auto const& day : days)
+		total += day.sessions;
+
+	// Средняя скорость в момент t (0..1) истории.
+	auto const trend = [](double t) {
+		if (t < 0.35) return 49.0 - (1.0 * t / 0.35);
+		if (t < 0.6) return 48.0 - (1.5 * (t - 0.35) / 0.25);
+		return 46.5 + (5.0 * (t - 0.6) / 0.4);
+	};
+
+	// Постоянное зерно: одни и те же данные на каждом скриншоте.
+	std::mt19937                     rng(20260929); // NOLINT(bugprone-random-generator-seed)
+	std::normal_distribution<double> noise(0.0, 1.0);
+	std::uniform_int_distribution    gap_minutes(4, 12);
+	std::uniform_int_distribution    percent(0, 99);
+
+	QJsonArray sessions;
+	int        index = 0;
+	for (auto const& day : days)
+	{
+		QDateTime finished(QDate::currentDate().addDays(-day.days_ago), QTime(day.start_hour, 0));
+		finished = finished.addSecs(60LL * gap_minutes(rng));
+		for (int s = 0; s < day.sessions; ++s, ++index)
+		{
+			double const t        = static_cast<double>(index) / (total - 1);
+			double const warm_up  = s == 0 ? -1.2 : 0.0; // первая тренировка вечера - медленнее
+			double const wpm      = trend(t) + warm_up + std::clamp(1.9 * noise(rng), -4.0, 4.0);
+			double const accuracy = std::clamp(95.2 + (0.8 * t) + noise(rng), 92.5, 98.5);
+			bool const   free     = percent(rng) < 15;
+			int const    length   = free ? 320 + (90 * (index % 3)) : 250;
+			int const errors = static_cast<int>(std::lround(length * (100.0 - accuracy) / 100.0));
+
+			sessions.append(QJsonObject{
+			    {"finished_at", finished.toSecsSinceEpoch()},
+			    {"mode", free ? "free" : "smart"},
+			    {"language", "ru"},
+			    {"length", length},
+			    {"errors", errors},
+			    {"wpm", wpm},
+			    {"cpm", wpm * 5.0},
+			    {"accuracy", accuracy},
+			    {"consistency", std::clamp(62.0 + (6.0 * noise(rng)), 48.0, 79.0)},
+			    {"duration", length / (wpm * 5.0) * 60.0},
+			    {"keystrokes", length + errors},
+			});
+			finished = finished.addSecs(60LL * gap_minutes(rng));
+		}
 	}
 
 	// Слабые места: редкие буквы и неудобные переходы русской раскладки.
@@ -299,6 +356,8 @@ void UiSmokeTest::wrongLayoutIsReported()
 	QCOMPARE(spy.constFirst().constFirst().toString(), QStringLiteral("en"));
 	QCOMPARE(trainer_->cursorPosition(), 0); // нажатие не засчитано
 	snapshot("04-layout-warning");
+
+	trainer_->setLanguage(QStringLiteral("ru"));
 }
 
 void UiSmokeTest::freeTextSessionCompletesWithResult()
