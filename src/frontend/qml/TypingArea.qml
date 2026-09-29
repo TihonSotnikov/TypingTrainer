@@ -56,8 +56,9 @@ Rectangle {
             color: Theme.pending
             font.family: Theme.monoFamily
             font.pixelSize: Theme.typingFontSize
-            // Длинный текст показывается страницами: позиция - относительно начала страницы.
-            cursorPosition: Math.max(0, Math.min(Trainer.cursorPosition - Trainer.displayOffset, length))
+            // Позицию в документе страницы считает адаптер; length - на случай, если текст
+            // ещё не обновился.
+            cursorPosition: Math.max(0, Math.min(Trainer.displayCursorPosition, length))
         }
 
         Rectangle {

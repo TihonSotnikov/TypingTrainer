@@ -383,8 +383,17 @@ void QmlTypingTrainerAdapter::rebuildFormattedText()
 	}
 	html += QStringLiteral("</span>");
 
-	if (formatted_text_ == html) return;
+	// Позиция курсора в документе страницы. QTextDocument считает в UTF-16:
+	// символ вне BMP (например, эмодзи) занимает в нём две позиции.
+	auto const cursor         = std::clamp(static_cast<std::size_t>(std::max(cursor_position_, 0)),
+	                                       page_start_, page_end_);
+	int        display_cursor = 0;
+	for (std::size_t k = page_start_; k < cursor; ++k)
+		display_cursor += QChar::requiresSurrogates(chars_.at(k).character) ? 2 : 1;
+
+	if (formatted_text_ == html && display_cursor_ == display_cursor) return;
 	formatted_text_ = std::move(html);
+	display_cursor_ = display_cursor;
 	emit formattedTextChanged();
 }
 
