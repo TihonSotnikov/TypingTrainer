@@ -242,7 +242,15 @@ FocusScope {
 
         anchors.centerIn: parent
         modal: true
-        title: "Сбросить статистику?"
+        padding: 24
+
+        // Фон и заголовок свои, без эффектов стиля: тень Material требует аппаратной
+        // отрисовки, и на программной фон диалога пропадал.
+        background: Rectangle {
+            color: Theme.surface
+            radius: Theme.radius
+            border.color: Theme.border
+        }
 
         // У Material в тёмной теме подложка светлая: окно под диалогом засвечивалось.
         Overlay.modal: Rectangle {
@@ -255,6 +263,13 @@ FocusScope {
 
         ColumnLayout {
             spacing: 18
+
+            Label {
+                text: "Сбросить статистику?"
+                color: Theme.text
+                font.pixelSize: 20
+                font.weight: Font.DemiBold
+            }
 
             Label {
                 Layout.preferredWidth: 380
