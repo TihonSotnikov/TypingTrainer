@@ -182,6 +182,12 @@ void QmlTypingTrainerAdapter::backspace()
 	    KeyPressData{.key = ControlKey::Backspace, .timestamp = std::chrono::steady_clock::now()});
 }
 
+void QmlTypingTrainerAdapter::enter()
+{
+	core_->push_input(
+	    KeyPressData{.key = ControlKey::Enter, .timestamp = std::chrono::steady_clock::now()});
+}
+
 void QmlTypingTrainerAdapter::requestStatistics() { core_->push_input(RequestStatisticsCommand{}); }
 
 void QmlTypingTrainerAdapter::resetStatistics() { core_->push_input(ResetStatisticsCommand{}); }
@@ -322,9 +328,10 @@ void QmlTypingTrainerAdapter::splitPages()
 	page_starts_.assign(1, 0);
 	for (std::size_t start = 0; chars_.size() - start > K_PAGE_SIZE;)
 	{
-		// Граница страницы - сразу после пробела, чтобы не разрывать слово.
+		// Граница страницы - сразу после пробела или перевода строки, чтобы не разрывать слово.
 		std::size_t next = start + K_PAGE_SIZE;
-		while (next < chars_.size() && chars_.at(next - 1).character != U' ')
+		while (next < chars_.size() && chars_.at(next - 1).character != U' '
+		       && chars_.at(next - 1).character != U'\n')
 			++next;
 		if (next >= chars_.size()) break;
 		page_starts_.push_back(next);
@@ -354,7 +361,8 @@ void QmlTypingTrainerAdapter::rebuildFormattedText()
 
 	// Соседние символы с одинаковым статусом идут одним span: HTML остаётся компактным
 	// даже для длинных текстов. pre-wrap не даёт схлопнуть пробелы - иначе курсор
-	// разойдётся с позицией символа.
+	// разойдётся с позицией символа. Перевод строки виден как ↵ перед самим переводом:
+	// видно, где нажать Enter и где вместо него нажато другое.
 	QString html = QStringLiteral("<span style=\"white-space: pre-wrap;\">");
 	html.reserve((static_cast<qsizetype>(page_end_ - page_start_) * 2) + 256);
 
@@ -366,30 +374,39 @@ void QmlTypingTrainerAdapter::rebuildFormattedText()
 		for (; i < page_end_ && chars_.at(i).status == status; ++i)
 			run.push_back(chars_.at(i).character);
 
-		QString const text = QString::fromStdU32String(run).toHtmlEscaped();
+		QString open;
 		switch (status)
 		{
 		case CharStatus::Pending:
-			html += QStringLiteral("<span style=\"color:%1;\">%2</span>").arg(pending, text);
+			open = QStringLiteral("<span style=\"color:%1;\">").arg(pending);
 			break;
 		case CharStatus::Correct:
-			html += QStringLiteral("<span style=\"color:%1;\">%2</span>").arg(correct, text);
+			open = QStringLiteral("<span style=\"color:%1;\">").arg(correct);
 			break;
 		case CharStatus::Wrong:
-			html += QStringLiteral("<span style=\"color:%1;background-color:%2;\">%3</span>")
-			            .arg(wrong, wrong_bg, text);
+			open = QStringLiteral("<span style=\"color:%1;background-color:%2;\">")
+			           .arg(wrong, wrong_bg);
 			break;
 		}
+
+		// Сам перевод строки - <br> вне span со статусом. Перевод строки текстом начал бы
+		// новый абзац документа, а тот перенимает оформление ↵ - фон ошибки на всю ширину.
+		QString const text = QString::fromStdU32String(run).toHtmlEscaped().replace(
+		    QLatin1Char('\n'), QStringLiteral("↵</span><br>") + open);
+		html += open + text + QStringLiteral("</span>");
 	}
 	html += QStringLiteral("</span>");
 
-	// Позиция курсора в документе страницы. QTextDocument считает в UTF-16:
-	// символ вне BMP (например, эмодзи) занимает в нём две позиции.
+	// Позиция курсора в документе страницы. QTextDocument считает в UTF-16: символ вне BMP
+	// (например, эмодзи) занимает в нём две позиции, как и перевод строки со знаком ↵.
 	auto const cursor         = std::clamp(static_cast<std::size_t>(std::max(cursor_position_, 0)),
 	                                       page_start_, page_end_);
 	int        display_cursor = 0;
 	for (std::size_t k = page_start_; k < cursor; ++k)
-		display_cursor += QChar::requiresSurrogates(chars_.at(k).character) ? 2 : 1;
+	{
+		char32_t const ch = chars_.at(k).character;
+		display_cursor += (ch == U'\n' || QChar::requiresSurrogates(ch)) ? 2 : 1;
+	}
 
 	if (formatted_text_ == html && display_cursor_ == display_cursor) return;
 	formatted_text_ = std::move(html);

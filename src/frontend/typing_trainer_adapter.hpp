@@ -104,6 +104,8 @@ public:
 	/// \note Управляющие символы отбрасываются: Enter, Tab и сочетания обрабатывает QML.
 	Q_INVOKABLE void typeText(const QString& text);
 	Q_INVOKABLE void backspace();
+	/// \brief Перевод строки: засчитывается, только если текст ждёт его в этом месте.
+	Q_INVOKABLE void enter();
 
 	/// \brief Запросить свежую статистику (придёт через statisticsChanged).
 	Q_INVOKABLE void requestStatistics();

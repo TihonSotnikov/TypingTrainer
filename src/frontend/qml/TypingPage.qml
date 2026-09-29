@@ -83,6 +83,10 @@ FocusScope {
         case Qt.Key_Enter:
             if (paused) Trainer.resume()
             else if (!active || !Trainer.typingStarted) nextAction()
+            else {
+                Trainer.enter() // перевод строки в своём тексте; в середине строки не считается
+                idleTimer.restart()
+            }
             event.accepted = true
             return
         case Qt.Key_Tab:
