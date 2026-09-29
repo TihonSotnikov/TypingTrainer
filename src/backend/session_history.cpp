@@ -79,8 +79,7 @@ std::optional<double> SessionHistory::best_wpm(TrainingMode mode, Language langu
 	std::optional<double> best;
 	for (auto const& record : records_)
 	{
-		if (record.mode != mode) continue;
-		if (mode == TrainingMode::Smart && record.language != language) continue;
+		if (record.mode != mode || record.language != language) continue;
 		if (!best || record.metrics.wpm > *best) best = record.metrics.wpm;
 	}
 	return best;

@@ -24,7 +24,8 @@ public:
 	/// \brief Записи в хронологическом порядке.
 	[[nodiscard]] const std::vector<SessionRecord>& records() const { return records_; }
 
-	/// \brief Лучшая скорость среди сессий режима (для Smart - ещё и языка).
+	/// \brief Лучшая скорость среди сессий того же режима и языка.
+	/// \note Скорость на разных языках несравнима: другие буквы, другая привычка к раскладке.
 	/// \return std::nullopt, если подходящих сессий ещё не было.
 	[[nodiscard]] std::optional<double> best_wpm(TrainingMode mode, Language language) const;
 
