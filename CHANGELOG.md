@@ -3,7 +3,7 @@
 Все заметные изменения проекта. Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версии — [семантическое версионирование](https://semver.org/lang/ru/).
 
-## [Unreleased]
+## [1.2.0] — 2026-09-29
 
 ### Изменено
 
@@ -109,7 +109,7 @@
 Первая версия: умный и свободный режимы, метрики WPM, CPM и точность, пауза,
 статистика n-грамм в JSON, темы оформления.
 
-[Unreleased]: https://github.com/TihonSotnikov/TypingTrainer/compare/v1.1.1...HEAD
+[1.2.0]: https://github.com/TihonSotnikov/TypingTrainer/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/TihonSotnikov/TypingTrainer/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/TihonSotnikov/TypingTrainer/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/TihonSotnikov/TypingTrainer/releases/tag/v1.0.0
