@@ -39,7 +39,7 @@ TEST(SessionHistory, KeepsRecordsInOrderAndDropsOldest)
 	          static_cast<std::int64_t>(SessionHistory::K_MAX_RECORDS + 9));
 }
 
-TEST(SessionHistory, BestWpmIsPerModeAndSmartLanguage)
+TEST(SessionHistory, BestWpmIsPerModeAndLanguage)
 {
 	SessionHistory history;
 	EXPECT_FALSE(history.best_wpm(TrainingMode::Smart, Language::Russian).has_value());
@@ -51,7 +51,8 @@ TEST(SessionHistory, BestWpmIsPerModeAndSmartLanguage)
 
 	EXPECT_EQ(history.best_wpm(TrainingMode::Smart, Language::Russian), 52.0);
 	EXPECT_EQ(history.best_wpm(TrainingMode::Smart, Language::English), 70.0);
-	EXPECT_EQ(history.best_wpm(TrainingMode::Free, Language::English), 90.0); // язык не важен
+	EXPECT_EQ(history.best_wpm(TrainingMode::Free, Language::Russian), 90.0);
+	EXPECT_FALSE(history.best_wpm(TrainingMode::Free, Language::English).has_value());
 }
 
 TEST(SessionHistory, SaveAndLoadRoundTrip)
