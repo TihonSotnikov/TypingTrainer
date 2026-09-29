@@ -31,8 +31,21 @@ std::vector<std::u32string> split_words(const std::u32string& text)
 	return words;
 }
 
+/// \brief Обычные буквы тестового словаря: фон, на котором видно проблемные граммы.
+void add_typical_letters(std::vector<NgramScore>& ngrams, const std::u32string& letters,
+                         double weight)
+{
+	for (char32_t const ch : letters)
+		ngrams.push_back(NgramScore{.gram = std::u32string(1, ch), .weight = weight});
+}
+
+/// \brief Проблемная грамма на фоне обычных букв: без фона её не с чем сравнить.
 std::vector<NgramScore> weak(std::u32string gram, double weight = 1.0)
-{ return {NgramScore{.gram = std::move(gram), .weight = weight}}; }
+{
+	std::vector<NgramScore> ngrams = {NgramScore{.gram = std::move(gram), .weight = weight}};
+	add_typical_letters(ngrams, U"acdeghioprstu", 0.2);
+	return ngrams;
+}
 
 const std::vector<std::u32string>& test_dictionary()
 {
@@ -85,12 +98,41 @@ TEST(SmartTextGenerator, NgramsOutsideDictionaryAlphabetAreSkipped)
 		    NgramScore{.gram = U"щ" + std::u32string(1, U'а' + (i % 20)), .weight = 9.0});
 	ngrams.push_back(NgramScore{.gram = U"e ", .weight = 8.0});
 	ngrams.push_back(NgramScore{.gram = U"zz", .weight = 1.0});
+	add_typical_letters(ngrams, U"acdeghioprstu", 0.2);
 
 	SmartTextGenerator generator(5);
 	auto const         text = generator.generate(ngrams, test_dictionary(), 0.0, 120);
 
 	for (auto const& word : split_words(text))
 		EXPECT_NE(word.find(U"zz"), std::u32string::npos);
+}
+
+TEST(SmartTextGenerator, TypicalNgramsDoNotPullWordsIn)
+{
+	// Слово из одних обычных букв содержит много грамм из топа, но ни одна не хуже типичной.
+	std::vector<NgramScore> ngrams = {NgramScore{.gram = U"q", .weight = 1.0}};
+	add_typical_letters(ngrams, U"abcdefgh", 0.3);
+
+	SmartTextGenerator generator(7);
+	auto const         text = generator.generate(ngrams, {U"abcdefgh", U"qi", U"qo"}, 0.0, 150);
+
+	for (auto const& word : split_words(text))
+		EXPECT_NE(word.find(U'q'), std::u32string::npos) << "слово без проблемной граммы";
+}
+
+TEST(SmartTextGenerator, ShortWordsWithWeakNgramArePreferred)
+{
+	// Проблемная грамма во всех словах одна, но на символ текста её больше в коротких.
+	std::u32string const    long_word = U"qabcdefghijklmnop";
+	std::vector<NgramScore> ngrams    = {NgramScore{.gram = U"q", .weight = 1.0}};
+	add_typical_letters(ngrams, U"abcdefghijklmnop", 0.3);
+
+	SmartTextGenerator generator(8);
+	auto const         words
+	    = split_words(generator.generate(ngrams, {U"qa", U"qb", long_word}, 0.0, 3000));
+
+	auto const long_count = static_cast<std::size_t>(std::ranges::count(words, long_word));
+	EXPECT_LT(long_count * 5, words.size());
 }
 
 TEST(SmartTextGenerator, SameWordIsNotRepeatedBackToBack)

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <random>
 #include <string>
 #include <unordered_set>
@@ -23,6 +24,8 @@ constexpr int K_MAX_PICK_ATTEMPTS = 64;
 
 /// \brief Отобрать до K_TARGET_NGRAMS худших грамм, которые встречаются в словах словаря.
 /// \note Так отсекаются переходы через пробел, знаки препинания и граммы другого языка.
+///       Вес цели - превышение над медианой всех таких грамм: сочетания на типичном
+///       уровне в подбор слов не попадают, и чем грамма хуже остальных, тем она заметнее.
 std::vector<NgramScore> select_targets(const std::vector<NgramScore>&     weak_ngrams,
                                        const std::vector<std::u32string>& dictionary)
 {
@@ -31,22 +34,41 @@ std::vector<NgramScore> select_targets(const std::vector<NgramScore>&     weak_n
 		alphabet.insert(word.begin(), word.end());
 	auto const in_alphabet = [&alphabet](char32_t ch) { return alphabet.contains(ch); };
 
-	std::vector<NgramScore> targets;
-	targets.reserve(SmartTextGenerator::K_TARGET_NGRAMS);
+	std::vector<NgramScore> candidates;
 	for (auto const& ngram : weak_ngrams)
 	{
-		if (targets.size() >= SmartTextGenerator::K_TARGET_NGRAMS) break;
-
 		std::u32string gram = to_lower(ngram.gram);
 		if (gram.empty() || !std::ranges::all_of(gram, in_alphabet)) continue;
-		if (std::ranges::find(targets, gram, &NgramScore::gram) != targets.end()) continue;
+		candidates.push_back(NgramScore{.gram = std::move(gram), .weight = ngram.weight});
+	}
+	if (candidates.empty()) return {};
 
-		targets.push_back(NgramScore{.gram = std::move(gram), .weight = ngram.weight});
+	std::vector<double> weights;
+	weights.reserve(candidates.size());
+	std::ranges::transform(candidates, std::back_inserter(weights), &NgramScore::weight);
+	auto const middle = std::next(weights.begin(), static_cast<std::ptrdiff_t>(weights.size() / 2));
+	std::ranges::nth_element(weights, middle);
+	double const typical = *middle;
+
+	std::vector<NgramScore> targets;
+	targets.reserve(SmartTextGenerator::K_TARGET_NGRAMS);
+	for (auto& candidate : candidates)
+	{
+		// Граммы идут по убыванию веса: дальше только типичные и лучше.
+		if (targets.size() >= SmartTextGenerator::K_TARGET_NGRAMS || candidate.weight <= typical)
+			break;
+		if (std::ranges::find(targets, candidate.gram, &NgramScore::gram) != targets.end())
+			continue;
+
+		targets.push_back(
+		    NgramScore{.gram = std::move(candidate.gram), .weight = candidate.weight - typical});
 	}
 	return targets;
 }
 
-/// \brief Слова, содержащие целевые граммы, и их вес (сумма весов найденных грамм).
+/// \brief Слова, содержащие целевые граммы, и их вес (сумма весов найденных грамм на символ).
+/// \note Длина текста ограничена, поэтому вес считается на символ: длинное слово
+///       не должно обгонять короткое только за счёт числа букв.
 struct ScoredWords
 {
 	std::vector<const std::u32string*> words;
@@ -66,7 +88,7 @@ ScoredWords score_words(const std::vector<std::u32string>& dictionary,
 		if (score > 0.0)
 		{
 			scored.words.push_back(&word);
-			scored.weights.push_back(score);
+			scored.weights.push_back(score / static_cast<double>(word.size()));
 		}
 	}
 	return scored;
