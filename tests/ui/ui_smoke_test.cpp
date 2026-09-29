@@ -332,11 +332,9 @@ void UiSmokeTest::freeTextSessionCompletesWithResult()
 QQuickItem* UiSmokeTest::findButton(const QString& text) const
 {
 	for (auto* item : window_->findChildren<QQuickItem*>())
-	{
 		if (item->isVisible() && item->property("text").toString() == text
 		    && item->metaObject()->indexOfSignal("clicked()") >= 0)
 			return item;
-	}
 	return nullptr;
 }
 
