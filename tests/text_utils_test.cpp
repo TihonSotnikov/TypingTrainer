@@ -64,6 +64,13 @@ TEST(TextUtils, NormalizeReplacesTypography)
 TEST(TextUtils, NormalizeDropsInvisibleCharacters)
 { EXPECT_EQ(normalize_text(chars({0xFEFF, U'a', 0x00AD, U'b', 0x200B, U'c', 0x0007})), U"abc"); }
 
+TEST(TextUtils, NormalizeDropsCombiningMarks)
+{
+	// «Москва́» с ударением над «а» и «x⃗» со стрелкой над буквой.
+	EXPECT_EQ(normalize_text(chars({U'М', U'о', U'с', U'к', U'в', U'а', 0x0301})), U"Москва");
+	EXPECT_EQ(normalize_text(chars({U'x', 0x20D7})), U"x");
+}
+
 TEST(TextUtils, NormalizeKeepsRegularText)
 {
 	std::u32string const text
