@@ -11,6 +11,8 @@ Rectangle {
 
     /// Итог из Trainer.lastResult.
     property var result: ({})
+    /// Подпись кнопки следующего действия (по Enter).
+    property string nextText: "Новый текст"
 
     signal repeatRequested()
     signal nextRequested()
@@ -195,7 +197,7 @@ Rectangle {
             }
 
             XButton {
-                text: "Новый текст  ·  Enter"
+                text: root.nextText + "  ·  Enter"
                 highlighted: true
                 onClicked: root.nextRequested()
             }

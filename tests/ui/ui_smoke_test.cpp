@@ -69,6 +69,9 @@ private:
 	/// \brief Демо-история и статистика для скриншотов (только при TT_SCREENSHOT_DIR).
 	void seedDemoData() const;
 
+	/// \brief Видимая кнопка с заданной надписью или nullptr.
+	[[nodiscard]] QQuickItem* findButton(const QString& text) const;
+
 	/// \brief Нажать кнопку с заданной надписью.
 	void clickButton(const QString& text) const;
 
@@ -313,27 +316,35 @@ void UiSmokeTest::freeTextSessionCompletesWithResult()
 	QCOMPARE(result.value("language").toString(), QStringLiteral("ru"));
 	snapshot("05-result");
 
-	// Enter после завершения - следующая тренировка.
+	// Со своим текстом «новый текст» совпадал бы с «заново»: Enter открывает редактор,
+	// а отмена правки возвращает к тому же тексту.
+	QVERIFY(findButton(QStringLiteral("Новый текст")) == nullptr);
 	QTest::keyClick(window_, Qt::Key_Return);
-	QTRY_COMPARE(trainer_->status(), Status::Active);
+	QTRY_COMPARE(trainer_->status(), Status::Inactive);
+	QTest::keyClick(window_, Qt::Key_Escape);
+	QTRY_VERIFY(trainer_->status() == Status::Active && currentText() == trainer_->customText());
 
 	trainer_->setSmartMode(true);
 	trainer_->start();
 	QTRY_VERIFY(trainer_->status() == Status::Active && currentText() != trainer_->customText());
 }
 
-void UiSmokeTest::clickButton(const QString& text) const
+QQuickItem* UiSmokeTest::findButton(const QString& text) const
 {
 	for (auto* item : window_->findChildren<QQuickItem*>())
 	{
 		if (item->isVisible() && item->property("text").toString() == text
 		    && item->metaObject()->indexOfSignal("clicked()") >= 0)
-		{
-			QVERIFY(QMetaObject::invokeMethod(item, "clicked"));
-			return;
-		}
+			return item;
 	}
-	QFAIL(qPrintable("нет кнопки " + text));
+	return nullptr;
+}
+
+void UiSmokeTest::clickButton(const QString& text) const
+{
+	QQuickItem* const button = findButton(text);
+	QVERIFY2(button != nullptr, qPrintable("нет кнопки " + text));
+	QVERIFY(QMetaObject::invokeMethod(button, "clicked"));
 }
 
 void UiSmokeTest::statisticsPageShowsHistory()
