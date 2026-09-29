@@ -108,13 +108,23 @@ FocusScope {
                     title: "Длина текста"
                     description: "Сколько символов в одной тренировке"
 
-                    SpinBox {
-                        from: 50
-                        to: 1000
+                    Slider {
+                        width: 200
+                        from: Trainer.minTargetLength
+                        to: Trainer.maxTargetLength
                         stepSize: 50
-                        editable: true
+                        snapMode: Slider.SnapAlways
+                        focusPolicy: Qt.NoFocus
                         value: Trainer.targetLength
-                        onValueModified: Trainer.targetLength = value
+                        onMoved: Trainer.targetLength = value
+                    }
+
+                    Label {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 48
+                        text: Trainer.targetLength
+                        color: Theme.textMuted
+                        font.pixelSize: 14
                     }
                 }
             }

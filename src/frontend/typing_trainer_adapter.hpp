@@ -54,6 +54,8 @@ class QmlTypingTrainerAdapter : public QObject
 	Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
 	Q_PROPERTY(double difficulty READ difficulty WRITE setDifficulty NOTIFY difficultyChanged)
 	Q_PROPERTY(int targetLength READ targetLength WRITE setTargetLength NOTIFY targetLengthChanged)
+	Q_PROPERTY(int minTargetLength READ minTargetLength CONSTANT)
+	Q_PROPERTY(int maxTargetLength READ maxTargetLength CONSTANT)
 	Q_PROPERTY(bool ignoreCase READ ignoreCase WRITE setIgnoreCase NOTIFY ignoreCaseChanged)
 	Q_PROPERTY(bool autoPause READ autoPause WRITE setAutoPause NOTIFY autoPauseChanged)
 	Q_PROPERTY(QString customText READ customText WRITE setCustomText NOTIFY customTextChanged)
@@ -131,6 +133,9 @@ public:
 	[[nodiscard]] bool    autoPause() const { return auto_pause_; }
 	[[nodiscard]] QString customText() const { return custom_text_; }
 
+	[[nodiscard]] static int minTargetLength() { return K_MIN_TARGET_LENGTH; }
+	[[nodiscard]] static int maxTargetLength() { return K_MAX_TARGET_LENGTH; }
+
 	void setSmartMode(bool enabled);
 	void setLanguage(const QString& code);
 	void setDifficulty(double value);
@@ -200,6 +205,10 @@ private:
 	void        saveCustomText() const;
 
 	[[nodiscard]] SessionConfig sessionConfig() const;
+
+	/// \brief Пределы длины текста умного режима, символов (они же - шкала в настройках).
+	static constexpr int K_MIN_TARGET_LENGTH = 50;
+	static constexpr int K_MAX_TARGET_LENGTH = 1000;
 
 	std::unique_ptr<ITypingTrainerCore> core_;
 	QString                             data_location_;

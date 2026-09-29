@@ -38,9 +38,6 @@ constexpr auto K_SETTINGS_GROUP   = "session";
 ///        с его длиной, а страница держит стоимость нажатия постоянной.
 constexpr std::size_t K_PAGE_SIZE = 2000;
 
-constexpr int K_MIN_TARGET_LENGTH = 50;
-constexpr int K_MAX_TARGET_LENGTH = 2000;
-
 /// \brief Текст для свободного режима, пока пользователь не ввёл свой.
 QString defaultCustomText()
 {
