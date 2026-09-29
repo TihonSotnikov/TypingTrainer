@@ -23,7 +23,9 @@ Checks: >
   -misc-non-private-member-variables-in-classes,
   -readability-identifier-length
 
-  HeaderFilterRegex: '^(src)/.*'
+# Только заголовки проекта из src/. Пути приходят абсолютными; сгенерированные файлы
+# сборки (moc, словари) и сторонние заголовки под фильтр не попадают.
+HeaderFilterRegex: '.*/src/(backend/|frontend/)?[^/]+\.hpp$'
 
 WarningsAsErrors: >
   clang-diagnostic-*,
