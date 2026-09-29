@@ -52,6 +52,16 @@ private:
 	void process_char(char32_t pressed, Clock::time_point timestamp,
 	                  std::vector<BackendEvent>& out);
 
+	/// \brief Пройти отступ в начале строки под курсором: пробелы отмечаются набранными.
+	/// \note Отступ не набирают руками и не считают ни в скорости, ни в нажатиях.
+	void skip_indentation();
+
+	/// \brief skip_indentation() с обновлениями для UI по каждому пройденному пробелу.
+	void emit_skipped_indentation(std::vector<BackendEvent>& out);
+
+	/// \brief Входит ли позиция в отступ строки (от начала строки - одни пробелы).
+	[[nodiscard]] bool is_indentation(std::size_t index) const;
+
 	/// \brief Подвести итог завершённой сессии: запись в историю и отчёт для UI.
 	[[nodiscard]] SessionResult finish_session();
 

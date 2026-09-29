@@ -47,6 +47,13 @@ protected:
 		return all;
 	}
 
+	/// \brief Нажать Enter через step после предыдущего нажатия.
+	std::vector<BackendEvent> enter(milliseconds step = milliseconds(200))
+	{
+		now_ += step;
+		return engine_.handle(control(ControlKey::Enter, now_));
+	}
+
 	SessionEngine     engine_;
 	Clock::time_point now_ = Clock::now();
 };
@@ -283,13 +290,80 @@ TEST_F(SessionEngineTest, WrongLayoutKeysAreReportedButNotCounted)
 
 TEST_F(SessionEngineTest, CustomTextIsNormalized)
 {
-	auto const states = events_of<SessionState>(engine_.handle(start_free(U"  two\n\nlines  ")));
+	auto const states
+	    = events_of<SessionState>(engine_.handle(start_free(U"  two  words  \n\n\n  lines  ")));
 	ASSERT_EQ(states.size(), 1U);
 
 	std::u32string text;
 	for (auto const& ch : states[0].chars)
 		text.push_back(ch.character);
-	EXPECT_EQ(text, U"two lines");
+	EXPECT_EQ(text, U"two words\n\nlines");
+}
+
+TEST_F(SessionEngineTest, EnterTypesLineBreakOnlyAtLineEnd)
+{
+	(void)engine_.handle(start_free(U"ab\ncd"));
+	(void)type(U"a");
+	EXPECT_TRUE(enter().empty()); // в середине строки Enter не засчитывается
+
+	(void)type(U"b");
+	auto const update = last_update(enter());
+	EXPECT_EQ(update.changed_index, 2U);
+	EXPECT_EQ(update.changed_char.status, CharStatus::Correct);
+	EXPECT_EQ(update.cursor_position, 3U);
+	EXPECT_EQ(update.metrics.keystrokes, 3U);
+}
+
+TEST_F(SessionEngineTest, IndentationIsSkippedAndNotCountedAsTyped)
+{
+	(void)engine_.handle(start_free(U"a\n    b"));
+	(void)type(U"a");
+
+	auto const updates = events_of<StateUpdate>(enter());
+	ASSERT_EQ(updates.size(), 5U); // перевод строки и четыре пробела отступа
+	EXPECT_EQ(updates.back().cursor_position, 6U);
+	EXPECT_EQ(updates.back().changed_char.status, CharStatus::Correct);
+
+	auto const last = last_update(type(U"b"));
+	ASSERT_TRUE(last.is_completed);
+	// Верно набраны три символа за 0.4 с: отступ не ускоряет и не замедляет.
+	EXPECT_EQ(last.metrics.keystrokes, 3U);
+	EXPECT_NEAR(last.metrics.cpm, 3.0 / 0.4 * 60.0, 1e-9);
+}
+
+TEST_F(SessionEngineTest, BackspaceErasesIndentationWithLineBreak)
+{
+	(void)engine_.handle(start_free(U"a\n  b"));
+	(void)type(U"a");
+	(void)enter();
+
+	auto const updates = events_of<StateUpdate>(engine_.handle(control(ControlKey::Backspace)));
+	ASSERT_EQ(updates.size(), 3U);
+	for (auto const& update : updates)
+		EXPECT_EQ(update.changed_char.status, CharStatus::Pending);
+	EXPECT_EQ(updates.back().cursor_position, 1U);
+
+	// Перевод строки набирается заново, и отступ снова проходится сам.
+	EXPECT_EQ(last_update(enter()).cursor_position, 4U);
+}
+
+TEST_F(SessionEngineTest, WrongKeyAtLineEndMovesToNextLine)
+{
+	(void)engine_.handle(start_free(U"a\n b"));
+	(void)type(U"a");
+
+	auto const updates = events_of<StateUpdate>(type(U" ")); // пробел вместо Enter
+	ASSERT_EQ(updates.size(), 2U);
+	EXPECT_EQ(updates.front().changed_char.status, CharStatus::Wrong);
+	EXPECT_EQ(updates.back().cursor_position, 3U);
+}
+
+TEST_F(SessionEngineTest, FirstLineIndentationIsSkippedAtStart)
+{
+	auto const states = events_of<SessionState>(engine_.handle(start_free(U"  a\nb")));
+	ASSERT_EQ(states.size(), 1U);
+	EXPECT_EQ(states[0].cursor_position, 2U);
+	EXPECT_TRUE(engine_.handle(control(ControlKey::Backspace)).empty()); // стирать нечего
 }
 
 TEST_F(SessionEngineTest, BlankCustomTextDoesNotStartSession)

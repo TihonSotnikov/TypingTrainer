@@ -154,6 +154,7 @@ void SessionEngine::begin_session(std::u32string text, const SessionConfig& conf
 	rhythm_.reset();
 	session_ngrams_.clear();
 	break_typing_chain();
+	skip_indentation(); // первая строка своего текста может начинаться с отступа
 
 	out.emplace_back(snapshot());
 }
@@ -201,8 +202,20 @@ void SessionEngine::process_key_press(const KeyPressData& key_data, std::vector<
 
 	if (auto const* ctrl = std::get_if<ControlKey>(&key_data.key))
 	{
-		if (*ctrl == ControlKey::Escape) pause_session(out);
-		else if (*ctrl == ControlKey::Backspace) process_backspace(out);
+		switch (*ctrl)
+		{
+		case ControlKey::Escape:
+			pause_session(out);
+			break;
+		case ControlKey::Backspace:
+			process_backspace(out);
+			break;
+		case ControlKey::Enter:
+			// Enter в середине строки - не опечатка в тексте, а привычка: не засчитываем.
+			if (cursor_ < text_to_type_.size() && text_to_type_.at(cursor_) == U'\n')
+				process_char(U'\n', key_data.timestamp, out);
+			break;
+		}
 		return;
 	}
 
@@ -213,18 +226,27 @@ void SessionEngine::process_backspace(std::vector<BackendEvent>& out)
 {
 	break_typing_chain(); // перепечатывание даст мусорный контекст и интервалы
 
-	if (cursor_ == 0) return;
+	// Отступ строки проставляется сам и стирается вместе с переводом строки перед ним.
+	std::size_t target = cursor_;
+	while (target > 0 && is_indentation(target - 1))
+		--target;
+	if (target == 0) return; // перед курсором ничего нет или только отступ первой строки
+	--target;
 
-	--cursor_;
-	if (chars_.at(cursor_).status == CharStatus::Correct) --correct_count_;
-	chars_.at(cursor_).status = CharStatus::Pending;
+	while (cursor_ > target)
+	{
+		--cursor_;
+		CharState& state = chars_.at(cursor_);
+		if (state.status == CharStatus::Correct && !is_indentation(cursor_)) --correct_count_;
+		state.status = CharStatus::Pending;
 
-	out.emplace_back(StateUpdate{.changed_index   = cursor_,
-	                             .changed_char    = chars_.at(cursor_),
-	                             .cursor_position = cursor_,
-	                             .metrics         = metrics_,
-	                             .is_completed    = false,
-	                             .status          = status_});
+		out.emplace_back(StateUpdate{.changed_index   = cursor_,
+		                             .changed_char    = state,
+		                             .cursor_position = cursor_,
+		                             .metrics         = metrics_,
+		                             .is_completed    = false,
+		                             .status          = status_});
+	}
 }
 
 void SessionEngine::process_char(char32_t pressed, Clock::time_point timestamp,
@@ -291,6 +313,35 @@ void SessionEngine::process_char(char32_t pressed, Clock::time_point timestamp,
 	else
 	{
 		cursor_++;
+		if (expected == U'\n') emit_skipped_indentation(out);
+	}
+}
+
+void SessionEngine::skip_indentation()
+{
+	while (cursor_ < chars_.size() && text_to_type_.at(cursor_) == U' ')
+		chars_.at(cursor_++).status = CharStatus::Correct;
+}
+
+void SessionEngine::emit_skipped_indentation(std::vector<BackendEvent>& out)
+{
+	std::size_t const from = cursor_;
+	skip_indentation();
+	for (std::size_t i = from; i < cursor_; ++i)
+		out.emplace_back(StateUpdate{.changed_index   = i,
+		                             .changed_char    = chars_.at(i),
+		                             .cursor_position = i + 1,
+		                             .metrics         = metrics_,
+		                             .is_completed    = false,
+		                             .status          = status_});
+}
+
+bool SessionEngine::is_indentation(std::size_t index) const
+{
+	for (std::size_t i = index;; --i)
+	{
+		if (text_to_type_.at(i) != U' ') return false;
+		if (i == 0 || text_to_type_.at(i - 1) == U'\n') return true;
 	}
 }
 
