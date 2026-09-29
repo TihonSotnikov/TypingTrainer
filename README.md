@@ -4,11 +4,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/C%2B%2B-20-a8c8f0?style=flat&logo=cplusplus&logoColor=white" alt="C++20">
-  <img src="https://img.shields.io/badge/Qt-6.5%2B-b8e0d2?style=flat&logo=qt&logoColor=white" alt="Qt 6.5+">
-  <img src="https://img.shields.io/badge/CMake-3.21%2B-b8e0d2?style=flat&logo=cmake&logoColor=white" alt="CMake 3.21+">
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-f5d5b8?style=flat" alt="Windows | macOS | Linux">
-  <img src="https://img.shields.io/badge/license-MIT-d4c8f0?style=flat" alt="MIT">
+  <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat&logo=cplusplus&logoColor=white" alt="C++20">
+  <img src="https://img.shields.io/badge/Qt-6.5%2B-41CD52?style=flat&logo=qt&logoColor=white" alt="Qt 6.5+">
+  <img src="https://img.shields.io/badge/CMake-3.21%2B-064F8C?style=flat&logo=cmake&logoColor=white" alt="CMake 3.21+">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D6?style=flat" alt="Windows | macOS | Linux">
+  <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat" alt="MIT">
 </p>
 
 <p align="center">
