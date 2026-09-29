@@ -45,6 +45,15 @@ QString defaultCustomText()
 	                      "В чащах юга жил бы цитрус? Да, но фальшивый экземпляр!");
 }
 
+/// \brief Свой текст в виде для набора: составная форма Unicode и normalize_text.
+/// \note В тексте из PDF или с macOS «й» и «ё» бывают разложены на букву и отдельный
+///       знак; без NFC такая буква заняла бы две позиции набора.
+QString typeableText(const QString& text)
+{
+	return QString::fromStdU32String(
+	    normalize_text(text.normalized(QString::NormalizationForm_C).toStdU32String()));
+}
+
 /// \brief Каталог пользовательских данных (создаётся при необходимости).
 /// \note Переменная окружения TYPING_TRAINER_DATA_DIR задаёт свой каталог (портативный
 ///       режим, тесты). До версии 1.1 статистика писалась в текущий каталог процесса:
@@ -141,7 +150,7 @@ QmlTypingTrainerAdapter::~QmlTypingTrainerAdapter()
 void QmlTypingTrainerAdapter::start()
 {
 	// Набирать нечего - прежняя тренировка не должна остаться активной под видом своего текста.
-	if (!smart_mode_ && normalize_text(custom_text_.toStdU32String()).empty())
+	if (!smart_mode_ && custom_text_.isEmpty())
 	{
 		stop();
 		return;
@@ -300,7 +309,7 @@ void QmlTypingTrainerAdapter::showPreview()
 	cursor_position_ = 0;
 
 	if (!smart_mode_)
-		for (char32_t const ch : normalize_text(custom_text_.toStdU32String()))
+		for (char32_t const ch : custom_text_.toStdU32String())
 			chars_.push_back(CharState{.character = ch, .status = CharStatus::Pending});
 
 	splitPages();
@@ -439,7 +448,7 @@ void QmlTypingTrainerAdapter::setAutoPause(bool enabled)
 void QmlTypingTrainerAdapter::setCustomText(const QString& text)
 {
 	// Храним уже нормализованный текст: в редакторе видно ровно то, что придётся набирать.
-	QString const normalized = QString::fromStdU32String(normalize_text(text.toStdU32String()));
+	QString const normalized = typeableText(text);
 	if (custom_text_ == normalized) return;
 	custom_text_ = normalized;
 	saveCustomText();
@@ -462,9 +471,10 @@ void QmlTypingTrainerAdapter::loadSettings()
 	auto_pause_  = settings.value(QStringLiteral("autoPause"), auto_pause_).toBool();
 	settings.endGroup();
 
+	// Файл могла записать версия, ещё не приводившая текст к составной форме.
 	QFile file(QDir(data_location_).filePath(QString::fromLatin1(K_CUSTOM_TEXT_FILE)));
-	custom_text_
-	    = file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : defaultCustomText();
+	custom_text_ = file.open(QIODevice::ReadOnly) ? typeableText(QString::fromUtf8(file.readAll()))
+	                                              : defaultCustomText();
 }
 
 void QmlTypingTrainerAdapter::saveSetting(const QString& key, const QVariant& value)

@@ -47,6 +47,7 @@ private slots:
 	void longTextIsShownInPages();
 	void emptyCustomTextStopsSession();
 	void typingStartsAfterEditingCustomText();
+	void decomposedLettersAreComposed();
 
 private:
 	/// \brief Текст текущей сессии без HTML-разметки.
@@ -461,6 +462,24 @@ void UiSmokeTest::typingStartsAfterEditingCustomText()
 
 	type(QStringLiteral("ed"));
 	QTRY_COMPARE(trainer_->cursorPosition(), 2);
+
+	trainer_->setSmartMode(true);
+	trainer_->start();
+	waitForActiveSession();
+}
+
+void UiSmokeTest::decomposedLettersAreComposed()
+{
+	// «мой ёж», где «й» и «ё» разложены на букву и отдельный знак, как в тексте из PDF.
+	trainer_->setCustomText(QString::fromUtf16(u"мой ёж"));
+	QCOMPARE(trainer_->customText(), QStringLiteral("мой ёж"));
+
+	trainer_->setSmartMode(false);
+	trainer_->start();
+	QTRY_VERIFY(trainer_->status() == Status::Active && currentText() == trainer_->customText());
+	type(QStringLiteral("мой ёж"));
+	QTRY_COMPARE(trainer_->status(), Status::Completed);
+	QCOMPARE(trainer_->accuracy(), 100.0);
 
 	trainer_->setSmartMode(true);
 	trainer_->start();
