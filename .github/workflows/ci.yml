@@ -16,6 +16,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  # Версия Qt для сборки пакетов; в матрице указывается только отличающаяся.
   QT_VERSION: "6.10.3"
 
 jobs:
@@ -51,15 +52,12 @@ jobs:
         include:
           - name: Linux
             os: ubuntu-22.04
-            qt: "6.10.3"
             package: true
           - name: Windows
             os: windows-2022
-            qt: "6.10.3"
             package: true
           - name: macOS
             os: macos-15
-            qt: "6.10.3"
             package: true
           # Минимальная поддерживаемая версия Qt: только сборка и тесты.
           - name: Linux, Qt 6.5
@@ -83,10 +81,10 @@ jobs:
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
             xvfb
 
-      - name: Install Qt ${{ matrix.qt }}
+      - name: Install Qt ${{ matrix.qt || env.QT_VERSION }}
         uses: jurplel/install-qt-action@v4
         with:
-          version: ${{ matrix.qt }}
+          version: ${{ matrix.qt || env.QT_VERSION }}
           cache: true
 
       - name: Read project version
