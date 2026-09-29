@@ -4,7 +4,8 @@ import QtQuick.Layouts
 import TypingTrainerModule
 
 /// Редактор своего текста для свободного режима.
-Rectangle {
+/// Область фокуса: закрывая редактор, владелец снимает с неё фокус целиком.
+FocusScope {
     id: root
 
     /// Пользователь сохранил текст.
@@ -19,9 +20,12 @@ Rectangle {
         editor.cursorPosition = editor.length
     }
 
-    color: Theme.surface
-    radius: Theme.radius
-    border.color: Theme.border
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.surface
+        radius: Theme.radius
+        border.color: Theme.border
+    }
 
     ColumnLayout {
         anchors.fill: parent
