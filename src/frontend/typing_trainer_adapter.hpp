@@ -234,7 +234,7 @@ private:
 	int     target_length_ = 250;
 	bool    ignore_case_   = false;
 	bool    auto_pause_    = true;
-	QString custom_text_;
+	QString custom_text_; ///< Всегда в виде для набора: пустой - набирать нечего.
 
 	// Цвета подсветки
 	QColor pending_color_{0x9E, 0x9E, 0x9E};
