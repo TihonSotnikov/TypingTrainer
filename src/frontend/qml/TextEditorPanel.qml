@@ -51,16 +51,31 @@ FocusScope {
                 textFormat: TextEdit.PlainText
                 wrapMode: TextEdit.Wrap
                 selectByMouse: true
-                placeholderText: "Например, отрывок из любимой книги"
                 color: Theme.text
                 font.family: Theme.monoFamily
                 font.pixelSize: 17
+                // Текст вровень с пояснением над ним: рамки у поля нет.
+                leftPadding: 0
+                rightPadding: 0
+                topPadding: 0
+                bottomPadding: 0
                 // Рамку рисует панель. Пустой фон, а не null: Material в Qt 6.5 обращается к нему.
                 background: Rectangle {
                     color: "transparent"
                 }
 
                 Keys.onEscapePressed: root.cancelled()
+
+                // Своя подсказка вместо placeholderText: подсказка Material при фокусе
+                // всплывает на рамку поля, а без рамки ложится поверх текста.
+                Label {
+                    x: editor.leftPadding
+                    y: editor.topPadding
+                    visible: editor.length === 0 && editor.preeditText.length === 0
+                    text: "Например, отрывок из любимой книги"
+                    color: Theme.textMuted
+                    font: editor.font
+                }
             }
         }
 
