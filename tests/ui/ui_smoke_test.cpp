@@ -46,6 +46,7 @@ private slots:
 	void autoPauseStopsTheClock();
 	void longTextIsShownInPages();
 	void emptyCustomTextStopsSession();
+	void typingStartsAfterEditingCustomText();
 
 private:
 	/// \brief Текст текущей сессии без HTML-разметки.
@@ -431,6 +432,26 @@ void UiSmokeTest::emptyCustomTextStopsSession()
 	QTest::keyClick(window_, Qt::Key_Tab);
 	QTest::qWait(200);
 	QCOMPARE(trainer_->status(), Status::Inactive);
+
+	trainer_->setSmartMode(true);
+	trainer_->start();
+	waitForActiveSession();
+}
+
+void UiSmokeTest::typingStartsAfterEditingCustomText()
+{
+	trainer_->setCustomText(QString());
+	trainer_->setSmartMode(false);
+	clickButton(QStringLiteral("Изменить текст"));
+	QTRY_COMPARE(trainer_->status(), Status::Inactive);
+
+	type(QStringLiteral("edited text"));
+	clickButton(QStringLiteral("Сохранить"));
+	QTRY_VERIFY(trainer_->status() == Status::Active
+	            && currentText() == QStringLiteral("edited text"));
+
+	type(QStringLiteral("ed"));
+	QTRY_COMPARE(trainer_->cursorPosition(), 2);
 
 	trainer_->setSmartMode(true);
 	trainer_->start();

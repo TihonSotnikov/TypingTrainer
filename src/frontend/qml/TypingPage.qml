@@ -48,6 +48,8 @@ FocusScope {
     function finishEditing(text) {
         if (text !== undefined) Trainer.customText = text
         editing = false
+        // Скрытый редактор сам фокус не отдаёт: иначе нажатия уходили бы в него, а не в набор.
+        editor.focus = false
         page.forceActiveFocus()
         newText()
     }
