@@ -49,6 +49,7 @@ private slots:
 	void typingStartsAfterEditingCustomText();
 	void decomposedLettersAreComposed();
 	void caretFollowsCharactersOutsideBmp();
+	void lineBreaksAreTypedWithEnter();
 
 private:
 	/// \brief Текст текущей сессии без HTML-разметки.
@@ -501,6 +502,31 @@ void UiSmokeTest::caretFollowsCharactersOutsideBmp()
 	type(QString::fromUtf16(u"a\U0001F600"));
 	QTRY_COMPARE(trainer_->cursorPosition(), 2);
 	QCOMPARE(trainer_->displayCursorPosition(), 3);
+
+	trainer_->setSmartMode(true);
+	trainer_->start();
+	waitForActiveSession();
+}
+
+void UiSmokeTest::lineBreaksAreTypedWithEnter()
+{
+	trainer_->setCustomText(QStringLiteral("if (x)\r\n    y();"));
+	QCOMPARE(trainer_->customText(), QStringLiteral("if (x)\n    y();"));
+
+	trainer_->setSmartMode(false);
+	trainer_->start();
+	QTRY_VERIFY(trainer_->status() == Status::Active && trainer_->textLength() == 15);
+	QCOMPARE(currentText(), QString::fromUtf16(u"if (x)↵\n    y();"));
+
+	type(QStringLiteral("if (x)"));
+	QTRY_COMPARE(trainer_->cursorPosition(), 6);
+	QTest::keyClick(window_, Qt::Key_Return);
+	QTRY_COMPARE(trainer_->cursorPosition(), 11);    // отступ пройден сам
+	QCOMPARE(trainer_->displayCursorPosition(), 12); // ↵ и перевод строки - две позиции
+
+	type(QStringLiteral("y();"));
+	QTRY_COMPARE(trainer_->status(), Status::Completed);
+	QCOMPARE(trainer_->accuracy(), 100.0);
 
 	trainer_->setSmartMode(true);
 	trainer_->start();
