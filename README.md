@@ -35,7 +35,7 @@
 | macOS 13+ (Apple Silicon и Intel) | `TypingTrainer-<версия>-macos-universal.dmg` - перенести приложение в Applications |
 | Linux x86_64 | `TypingTrainer-<версия>-linux-x86_64.AppImage` |
 
-Сборка для macOS не нотаризована Apple. AppImage запускается после выдачи прав на исполнение:
+Сборка для macOS не нотаризована Apple (system settings -> privacy & security -> security -> allow applications from). AppImage запускается после выдачи прав на исполнение:
 
 ```bash
 chmod +x TypingTrainer-*-linux-x86_64.AppImage
